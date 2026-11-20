@@ -1,5 +1,7 @@
-Hipótesis nula (H0): El importe promedio por pedido de los clientes es igual en todas las regiones analizadas.
-Hipótesis alternativa (H1): Al menos una región tiene un importe promedio por pedido de los clientes diferente.
-Nivel de significancia: α = 0.05
-ANOVA clásico: F = 0.4849; p = 0.6936.
-Decisión: no se rechaza H0. No hay evidencia suficiente para afirmar diferencias entre las medias regionales; Tukey HSD no se aplica.
+H0: el importe promedio por pedido de los clientes es igual en todas las regiones.
+H1: al menos una región tiene un importe promedio por pedido diferente.
+Nivel de significancia: alfa = 0.05
+Levene: p = 0.2022 (varianzas iguales)
+ANOVA clásico: F = 0.4849; p = 0.6936; eta² = 0.0163
+ANOVA de Welch: F = 0.4773; p = 0.7021
+Decisión: no se rechaza H0. No hay evidencia suficiente de diferencias entre regiones; Tukey HSD no se aplica.
