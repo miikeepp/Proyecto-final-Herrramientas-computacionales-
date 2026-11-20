@@ -1,1 +1,17 @@
-{"input_rows": 2823, "output_rows": 2823, "exact_duplicates_removed": 0, "duplicate_key_conflicts": 0, "sales_scope": "Solo STATUS = 'Shipped' para métricas principales; todas las filas se conservan.", "min_order_timestamp": "2003-01-06T00:00:00.000-05:00", "max_order_timestamp": "2005-05-31T00:00:00.000-05:00", "non_positive_quantity": 0, "negative_sales": 0, "null_order_number": 0, "null_quantity_ordered": 0, "null_price_each": 0, "null_order_line_number": 0, "null_sales": 0, "null_order_timestamp": 0, "null_status": 0, "null_source_quarter_id": 0, "null_source_month_id": 0, "null_source_year_id": 0, "null_product_line": 0, "null_msrp": 0, "null_product_code": 0, "null_customer_name": 0, "null_phone": 0, "null_address_line_1": 0, "null_address_line_2": 2521, "null_city": 0, "null_state": 1486, "null_postal_code": 76, "null_country": 0, "null_territory": 0, "null_contact_last_name": 0, "null_contact_first_name": 0, "null_deal_size": 0, "null_invalid_order_number": 0, "null_invalid_order_line_number": 0, "null_invalid_quantity": 0, "null_invalid_price_each": 0, "null_invalid_sales": 0, "null_invalid_order_date": 0, "null_invalid_msrp": 0, "null_has_quality_error": 0, "null_es_venta_realizada": 0, "null_order_date": 0, "null_year": 0, "null_month": 0, "null_quarter": 0, "invalid_order_number": 0, "invalid_order_line_number": 0, "invalid_quantity": 0, "invalid_price_each": 0, "invalid_sales": 0, "invalid_order_date": 0, "invalid_msrp": 0, "has_quality_error": 0}
+{
+  "filas_entrada": 2823,
+  "filas_salida": 2823,
+  "duplicados_eliminados": 0,
+  "precios_corregidos": 1304,
+  "errores_de_calidad": 0,
+  "fecha_minima": "2003-01-06",
+  "fecha_maxima": "2005-05-31",
+  "pedidos_shipped": 286,
+  "unidades_shipped": 91403,
+  "ventas_shipped": 9291501.08,
+  "nulos_por_columna": {
+    "address_line_2": 2521,
+    "state": 1486,
+    "postal_code": 76
+  }
+}
