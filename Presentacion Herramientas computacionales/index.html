@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js" defer></script>
   <style>
     :root {
       --ink:#0f2744; --muted:#5a7188; --navy:#081626; --navy2:#102a45;
@@ -326,7 +327,7 @@
           <div class="line-btns" id="lineBtns" role="tablist" aria-label="Seleccionar línea de producto"></div>
         </div>
       </div>
-      <p class="notice reveal">Los modelos 3D se generan en el navegador con <strong>Three.js</strong> (sin archivos externos) y representan cada línea del catálogo. Las cifras de ventas provienen del análisis del tablero Power BI.</p>
+      <p class="notice reveal">Los modelos 3D (archivos <code>.glb</code> en la carpeta <code>models/</code>) se cargan con <strong>Three.js</strong> solo cuando eliges su categoría, y representan cada línea del catálogo. Las cifras de ventas provienen del análisis del tablero Power BI.</p>
     </section>
 
     <section id="etl" aria-labelledby="etl-title">
@@ -1006,99 +1007,22 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
     function startThree() {
       if (typeof THREE === 'undefined') return;
 
-      // Helpers de materiales y primitivas
-      function mat(color, o) { o = o || {}; return new THREE.MeshStandardMaterial({ color: color, roughness: o.rough != null ? o.rough : 0.55, metalness: o.metal != null ? o.metal : 0.15, flatShading: o.flat !== false }); }
-      function box(w, h, d, color, o) { var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, o)); m.castShadow = true; m.receiveShadow = true; return m; }
-      function cyl(rt, rb, h, color, seg, o) { var m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 24), mat(color, o)); m.castShadow = true; return m; }
-      function wheel(x, y, z, r, w, hub) {
-        var g = new THREE.Group();
-        var t = cyl(r, r, w, '#141619', 22, { rough: 0.85, metal: 0.1 }); t.rotation.x = Math.PI / 2; g.add(t);
-        var rim = cyl(r * 0.42, r * 0.42, w + 0.02, hub || '#c9ccd2', 14, { metal: 0.8, rough: 0.3 }); rim.rotation.x = Math.PI / 2; g.add(rim);
-        g.position.set(x, y, z); return g;
-      }
-
-      /* --- Constructores de modelos (low-poly) --- */
-      function buildCar(c) {
-        var g = new THREE.Group();
-        var body0 = box(4, 0.7, 1.8, c.body, { metal: 0.45, rough: 0.3 }); body0.position.set(0, 0.95, 0); g.add(body0);
-        var low0 = box(4.2, 0.45, 1.7, c.body, { metal: 0.45, rough: 0.3 }); low0.position.set(0, 0.62, 0); g.add(low0);
-        var cabin = box(1.9, 0.7, 1.5, c.cabin || '#20364a', { metal: 0.2, rough: 0.15 }); cabin.position.set(-0.2, 1.5, 0); g.add(cabin);
-        var hood = box(1.3, 0.3, 1.6, c.body, { metal: 0.45 }); hood.position.set(1.4, 1.15, 0); g.add(hood);
-        [[1.3, 0.95], [1.3, -0.95], [-1.3, 0.95], [-1.3, -0.95]].forEach(function (p) { g.add(wheel(p[0], 0.5, p[1], 0.5, 0.35)); });
-        [[2.05, 0.6], [2.05, -0.6]].forEach(function (p) { var l = box(0.12, 0.2, 0.3, '#fff6cf', { metal: 0.1, rough: 0.1 }); l.position.set(p[0], 0.95, p[1]); g.add(l); });
-        var sp = box(0.2, 0.1, 1.6, '#15181c'); sp.position.set(-2, 1.25, 0); g.add(sp);
-        return g;
-      }
-      function buildVintage(c) {
-        var g = new THREE.Group();
-        var body = box(3.6, 0.9, 1.6, c.body, { metal: 0.3, rough: 0.4 }); body.position.y = 1.0; g.add(body);
-        var cabin = box(1.8, 1.0, 1.5, c.cabin || '#2a2118', { metal: 0.2, rough: 0.3 }); cabin.position.set(-0.4, 1.9, 0); g.add(cabin);
-        var hood = box(1.6, 0.6, 1.4, c.body, { metal: 0.3 }); hood.position.set(1.3, 1.2, 0); g.add(hood);
-        var grille = box(0.2, 0.7, 1.2, '#d9c27a', { metal: 0.7, rough: 0.25 }); grille.position.set(2.2, 1.0, 0); g.add(grille);
-        var b1 = box(3.8, 0.15, 0.2, '#1c1c1c'); b1.position.set(0, 0.62, 0.85); g.add(b1);
-        var b2 = b1.clone(); b2.position.z = -0.85; g.add(b2);
-        [[1.2, 0.9], [1.2, -0.9], [-1.2, 0.9], [-1.2, -0.9]].forEach(function (p) { g.add(wheel(p[0], 0.55, p[1], 0.55, 0.3, '#e2d9b0')); });
-        [[2.0, 0.65], [2.0, -0.65]].forEach(function (p) { var l = cyl(0.18, 0.18, 0.15, '#fff3c0', 12, { metal: 0.3 }); l.rotation.z = Math.PI / 2; l.position.set(p[0], 1.5, p[1]); g.add(l); });
-        return g;
-      }
-      function buildMoto(c) {
-        var g = new THREE.Group();
-        g.add(wheel(1.5, 0.9, 0, 0.9, 0.28));
-        g.add(wheel(-1.5, 0.9, 0, 0.9, 0.28));
-        var tank = box(1.4, 0.6, 0.7, c.body, { metal: 0.5, rough: 0.25 }); tank.position.set(0, 1.5, 0); g.add(tank);
-        var seat = box(1.1, 0.25, 0.6, '#1b1b1b'); seat.position.set(-0.9, 1.45, 0); g.add(seat);
-        var eng = box(0.8, 0.6, 0.8, '#3a3f45', { metal: 0.6 }); eng.position.set(0, 0.95, 0); g.add(eng);
-        var f1 = box(0.12, 1.3, 0.12, '#2a2d31', { metal: 0.6 }); f1.position.set(1.3, 1.3, 0.18); f1.rotation.z = 0.4; g.add(f1);
-        var f2 = f1.clone(); f2.position.z = -0.18; g.add(f2);
-        var hb = box(0.1, 0.1, 0.9, '#2a2d31', { metal: 0.6 }); hb.position.set(1.0, 2.0, 0); g.add(hb);
-        var ex = cyl(0.1, 0.12, 1.4, '#cfd3d8', 12, { metal: 0.8 }); ex.rotation.z = Math.PI / 2; ex.position.set(-0.8, 0.8, 0.35); g.add(ex);
-        return g;
-      }
-      function buildPlane(c) {
-        var g = new THREE.Group();
-        var fus = cyl(0.5, 0.35, 4.2, c.body, 26, { metal: 0.4, rough: 0.3 }); fus.rotation.z = Math.PI / 2; fus.position.y = 1.6; g.add(fus);
-        var nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.9, 22), mat(c.body, { metal: 0.4 })); nose.rotation.z = -Math.PI / 2; nose.position.set(2.4, 1.6, 0); g.add(nose);
-        var wing = box(1.3, 0.12, 5.4, c.cabin || '#d9dee3', { metal: 0.3, rough: 0.4 }); wing.position.set(0.1, 1.5, 0); g.add(wing);
-        var tw = box(0.9, 0.1, 2.0, c.cabin || '#d9dee3', { metal: 0.3 }); tw.position.set(-1.9, 1.7, 0); g.add(tw);
-        var fin = box(0.9, 1.2, 0.12, c.body, { metal: 0.4 }); fin.position.set(-1.9, 2.2, 0); g.add(fin);
-        [[0.4, 1.4], [0.4, -1.4]].forEach(function (p) { var e = cyl(0.28, 0.28, 0.9, '#3a3f45', 16, { metal: 0.6 }); e.rotation.z = Math.PI / 2; e.position.set(p[0], 1.2, p[1]); g.add(e); });
-        var s1 = box(2.6, 0.2, 0.05, '#bfe3ff', { metal: 0.2, rough: 0.1 }); s1.position.set(0.3, 1.75, 0.5); g.add(s1);
-        var s2 = s1.clone(); s2.position.z = -0.5; g.add(s2);
-        return g;
-      }
-      function buildShip(c) {
-        var g = new THREE.Group();
-        var hull = box(4.4, 0.9, 1.6, c.body, { metal: 0.2, rough: 0.5 }); hull.position.y = 0.8; g.add(hull);
-        var hull2 = box(3.6, 0.5, 1.2, c.body, { metal: 0.2, rough: 0.5 }); hull2.position.y = 0.35; g.add(hull2);
-        var deck = box(3.8, 0.15, 1.4, '#c9a36b', { rough: 0.7 }); deck.position.y = 1.28; g.add(deck);
-        var cabin = box(1.6, 0.9, 1.0, '#eef2f5', { rough: 0.4 }); cabin.position.set(-0.3, 1.8, 0); g.add(cabin);
-        var bridge = box(1.0, 0.5, 0.8, '#dfe6ea', { rough: 0.4 }); bridge.position.set(-0.3, 2.45, 0); g.add(bridge);
-        [0.0, 0.7].forEach(function (x) { var f = cyl(0.22, 0.26, 0.8, c.cabin || '#b4432f', 14, { rough: 0.5 }); f.position.set(0.3 - x, 2.3, 0); g.add(f); });
-        var mast = cyl(0.05, 0.05, 1.6, '#555', 8); mast.position.set(1.4, 2.2, 0); g.add(mast);
-        return g;
-      }
-      function buildTrain(c) {
-        var g = new THREE.Group();
-        var boiler = cyl(0.8, 0.8, 3.0, c.body, 26, { metal: 0.3, rough: 0.4 }); boiler.rotation.z = Math.PI / 2; boiler.position.set(0.3, 1.1, 0); g.add(boiler);
-        var cab = box(1.3, 1.5, 1.7, c.cabin || '#7a1f16', { rough: 0.5 }); cab.position.set(-1.8, 1.3, 0); g.add(cab);
-        var roof = box(1.5, 0.2, 1.9, '#2a2a2a'); roof.position.set(-1.8, 2.15, 0); g.add(roof);
-        var front = cyl(0.85, 0.85, 0.3, '#2a2a2a', 22); front.rotation.z = Math.PI / 2; front.position.set(1.85, 1.1, 0); g.add(front);
-        var chim = cyl(0.25, 0.3, 0.6, '#1c1c1c', 16); chim.position.set(1.4, 1.95, 0); g.add(chim);
-        var dome = cyl(0.3, 0.3, 0.3, '#d9b24a', 16, { metal: 0.6 }); dome.position.set(0.4, 1.95, 0); g.add(dome);
-        var cc = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.8, 4), mat('#2a2a2a')); cc.rotation.z = -Math.PI / 2; cc.rotation.y = Math.PI / 4; cc.position.set(2.3, 0.55, 0); g.add(cc);
-        var base = box(3.6, 0.3, 1.3, '#1c1c1c'); base.position.set(0, 0.45, 0); g.add(base);
-        [1.2, 0.2, -0.8].forEach(function (x) { [0.75, -0.75].forEach(function (z) { g.add(wheel(x, 0.45, z, 0.45, 0.18, '#b23')); }); });
-        return g;
-      }
-      function buildTruck(c) {
-        var g = new THREE.Group();
-        var cab = box(1.3, 1.3, 1.8, c.body, { metal: 0.4, rough: 0.3 }); cab.position.set(1.4, 1.25, 0); g.add(cab);
-        var ws = box(0.1, 0.7, 1.5, '#20364a', { metal: 0.2, rough: 0.15 }); ws.position.set(2.05, 1.5, 0); g.add(ws);
-        var boxc = box(3.2, 1.8, 1.9, c.cabin || '#e8ebee', { rough: 0.6 }); boxc.position.set(-1.0, 1.5, 0); g.add(boxc);
-        var chassis = box(5, 0.3, 1.5, '#1c1c1c'); chassis.position.set(0, 0.6, 0); g.add(chassis);
-        [2.0, -0.3, -1.6, -2.4].forEach(function (x) { [0.85, -0.85].forEach(function (z) { g.add(wheel(x, 0.5, z, 0.5, 0.3)); }); });
-        var grille = box(0.12, 0.5, 1.4, '#2a2d31', { metal: 0.6 }); grille.position.set(2.1, 1.0, 0); g.add(grille);
-        return g;
+      // Cargador GLB con caché: cada modelo se descarga una sola vez
+      var gltfLoader = new THREE.GLTFLoader();
+      var glbCache = {};
+      function loadGLB(url) {
+        if (!glbCache[url]) {
+          glbCache[url] = new Promise(function (resolve, reject) {
+            gltfLoader.load(url, function (gltf) {
+              gltf.scene.traverse(function (o) {
+                if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+              });
+              resolve(gltf.scene);
+            }, undefined, reject);
+          });
+        }
+        // Se devuelve un clon para poder usar el mismo modelo en varios visores
+        return glbCache[url].then(function (scene) { return scene.clone(true); });
       }
 
       // Normaliza tamaño y apoya el modelo sobre y=0
@@ -1126,7 +1050,20 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         renderer.setSize(w, h);
         renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
         container.appendChild(renderer.domElement);
+
+        // Entorno tipo estudio (reflejos para materiales metálicos de los GLB)
+        var pmrem = new THREE.PMREMGenerator(renderer);
+        var envScene = new THREE.Scene();
+        envScene.background = new THREE.Color(0x2a4a63);
+        [[0, 12, 0, 1.0], [10, 4, 6, 0.8], [-10, 4, -6, 0.6], [0, 3, -12, 0.5]].forEach(function (l) {
+          var panel = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(l[3] * 3, l[3] * 3, l[3] * 3), side: THREE.DoubleSide }));
+          panel.position.set(l[0], l[1], l[2]); panel.lookAt(0, 0, 0); envScene.add(panel);
+        });
+        scene.environment = pmrem.fromScene(envScene, 0.04).texture;
 
         scene.add(new THREE.HemisphereLight(0xdff2ff, 0x16222e, 0.9));
         var key = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -1139,7 +1076,7 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
         var fill = new THREE.DirectionalLight(0x9ad7ff, 0.35); fill.position.set(-5, 3, 5); scene.add(fill);
 
         // Pedestal + sombra de contacto
-        var disk = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.6, 0.3, 48), new THREE.MeshStandardMaterial({ color: 0x0c2235, roughness: 0.9, metalness: 0.1 }));
+        var disk = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.6, 0.3, 48), new THREE.MeshStandardMaterial({ color: new THREE.Color(0x0c2235).convertSRGBToLinear(), roughness: 0.9, metalness: 0.1, envMapIntensity: 0.15 }));
         disk.position.y = -0.17; disk.receiveShadow = true; scene.add(disk);
         var ring = new THREE.Mesh(new THREE.TorusGeometry(4.3, 0.04, 8, 64), new THREE.MeshStandardMaterial({ color: 0x18e0c0, emissive: 0x0b8f7a, emissiveIntensity: 0.6, roughness: 0.5 }));
         ring.rotation.x = Math.PI / 2; ring.position.y = 0.0; scene.add(ring);
@@ -1169,6 +1106,9 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
         function setModel(group) {
           while (holder.children.length) holder.remove(holder.children[0]);
           holder.add(group); enter = 0;
+          // Apunta la cámara a la mitad de la altura real del modelo
+          var bb = new THREE.Box3().setFromObject(group);
+          tgt.y = Math.max(0.6, (bb.max.y - bb.min.y) * 0.45);
         }
         function resize() {
           var W = container.clientWidth, H = container.clientHeight;
@@ -1195,23 +1135,25 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
 
       /* --- Catálogo de líneas de producto --- */
       var LINES = [
-        { name: 'Classic Cars', ico: '🏎️', sales: 3919615, build: buildCar, color: { body: '#d5372e', cabin: '#1d2a38' }, desc: 'Autos deportivos clásicos de colección: la categoría líder, la que más importe genera en todo el periodo.' },
-        { name: 'Vintage Cars', ico: '🚗', sales: 1903151, build: buildVintage, color: { body: '#2f8f7f', cabin: '#2a2118' }, desc: 'Autos de época con estribos y faros redondos. Segunda línea del catálogo por ventas.' },
-        { name: 'Motorcycles', ico: '🏍️', sales: 1166388, build: buildMoto, color: { body: '#e0912f' }, desc: 'Motocicletas a escala. Tercera línea en importe, con buen volumen de unidades vendidas.' },
-        { name: 'Trucks & Buses', ico: '🚚', sales: 1127790, build: buildTruck, color: { body: '#2d6fb0', cabin: '#e8ebee' }, desc: 'Camiones y buses. El canal se aproxima con deal_size (Small / Medium / Large).' },
-        { name: 'Planes', ico: '✈️', sales: 975004, build: buildPlane, color: { body: '#dfe4e9', cabin: '#9fb4c4' }, desc: 'Aviones a escala. Ticket alto por unidad y presencia en varias regiones comerciales.' },
-        { name: 'Ships', ico: '🚢', sales: 714437, build: buildShip, color: { body: '#324a5e', cabin: '#b4432f' }, desc: 'Barcos y navíos. Línea de nicho, con importes menores pero estables en el tiempo.' },
-        { name: 'Trains', ico: '🚂', sales: 226243, build: buildTrain, color: { body: '#1f6f74', cabin: '#7a1f16' }, desc: 'Trenes y locomotoras. La categoría más pequeña por importe, pero con el mejor margen (48 %).' }
+        { name: 'Classic Cars', ico: '🏎️', sales: 3919615, url: 'models/classic.glb', desc: 'Autos clásicos de colección: la categoría líder, la que más importe genera en todo el periodo.' },
+        { name: 'Vintage Cars', ico: '🚗', sales: 1903151, url: 'models/vintage.glb', desc: 'Autos de época. Segunda línea del catálogo por ventas.' },
+        { name: 'Motorcycles', ico: '🏍️', sales: 1166388, url: 'models/moto.glb', desc: 'Motocicletas a escala. Tercera línea en importe, con buen volumen de unidades vendidas.' },
+        { name: 'Trucks & Buses', ico: '🚚', sales: 1127790, url: 'models/truck.glb', desc: 'Camiones y buses. El canal se aproxima con deal_size (Small / Medium / Large).' },
+        { name: 'Planes', ico: '✈️', sales: 975004, url: 'models/plane.glb', desc: 'Aviones a escala. Ticket alto por unidad y presencia en varias regiones comerciales.' },
+        { name: 'Ships', ico: '🚢', sales: 714437, url: 'models/ships.glb', desc: 'Barcos y navíos. Línea de nicho, con importes menores pero estables en el tiempo.' },
+        { name: 'Trains', ico: '🚂', sales: 226243, url: 'models/train.glb', desc: 'Trenes y locomotoras. La categoría más pequeña por importe, pero con el mejor margen (48 %).' }
       ];
       var TOTAL = LINES.reduce(function (s, l) { return s + l.sales; }, 0);
       function money(n) { return '$' + (n / 1e6).toFixed(2) + 'M'; }
 
-      // Héroe: muestra el Classic Cars girando
+      // Héroe: modelo ligero (moto, 0,7 MB) para que la portada cargue rápido
       var heroEl = document.getElementById('hero3d');
       if (heroEl) {
         var heroView = makeViewer(heroEl, { autoRotate: true, zoom: false, startR: 10 });
-        if (heroView) heroView.setModel(normalize(buildCar(LINES[0].color), 5.2));
-        else { heroEl.style.display = 'none'; }
+        if (heroView) {
+          loadGLB('models/moto.glb').then(function (m) { heroView.setModel(normalize(m, 5.2)); })
+            .catch(function (err) { console.warn('No se pudo cargar el modelo del héroe', err); });
+        } else { heroEl.style.display = 'none'; }
       }
 
       // Showroom interactivo
@@ -1236,9 +1178,19 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
             b.addEventListener('click', function () { select(i); });
             lineBtns.appendChild(b);
           });
+          var current = -1;
           function select(i) {
             var line = LINES[i];
-            showView.setModel(normalize(line.build(line.color), 5.4));
+            current = i;
+            if (loader) { loader.innerHTML = '<div class="ring"></div>'; loader.classList.remove('hidden'); }
+            loadGLB(line.url).then(function (m) {
+              if (current !== i) return; // el usuario ya eligió otra categoría
+              showView.setModel(normalize(m, 5.4));
+              if (loader) loader.classList.add('hidden');
+            }).catch(function (err) {
+              console.warn('No se pudo cargar', line.url, err);
+              if (loader && current === i) loader.innerHTML = '<p style="padding:20px;text-align:center">No se pudo cargar el modelo 3D de esta categoría.</p>';
+            });
             Array.prototype.forEach.call(lineBtns.children, function (b, bi) { b.classList.toggle('active', bi === i); });
             spTitle.style.opacity = 0; spDesc.style.opacity = 0;
             setTimeout(function () {
@@ -1251,7 +1203,6 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
             }, 180);
           }
           select(0);
-          if (loader) setTimeout(function () { loader.classList.add('hidden'); }, 500);
         }
       }
     }
