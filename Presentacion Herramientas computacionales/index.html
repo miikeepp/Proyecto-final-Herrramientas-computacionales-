@@ -1007,6 +1007,13 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
     function startThree() {
       if (typeof THREE === 'undefined') return;
 
+      // Abierta como archivo (file://) el navegador bloquea la descarga de los .glb
+      var FILE_MODE = location.protocol === 'file:';
+      var FILE_MSG = '<p style="padding:24px;max-width:420px;text-align:center;line-height:1.5">' +
+        '<strong>Los modelos 3D no cargan al abrir el HTML como archivo.</strong><br>' +
+        'Abre la presentación con doble clic en <code>Abrir presentacion.bat</code> ' +
+        '(en la misma carpeta) o desde un servidor web.</p>';
+
       // Cargador GLB con caché: cada modelo se descarga una sola vez
       var gltfLoader = new THREE.GLTFLoader();
       var glbCache = {};
@@ -1152,7 +1159,11 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
         var heroView = makeViewer(heroEl, { autoRotate: true, zoom: false, startR: 10 });
         if (heroView) {
           loadGLB('models/moto.glb').then(function (m) { heroView.setModel(normalize(m, 5.2)); })
-            .catch(function (err) { console.warn('No se pudo cargar el modelo del héroe', err); });
+            .catch(function (err) {
+              console.warn('No se pudo cargar el modelo del héroe', err);
+              var hint = heroEl.querySelector('.hint');
+              if (hint && FILE_MODE) hint.textContent = 'Abre con «Abrir presentacion.bat» para ver el 3D';
+            });
         } else { heroEl.style.display = 'none'; }
       }
 
@@ -1189,7 +1200,7 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
               if (loader) loader.classList.add('hidden');
             }).catch(function (err) {
               console.warn('No se pudo cargar', line.url, err);
-              if (loader && current === i) loader.innerHTML = '<p style="padding:20px;text-align:center">No se pudo cargar el modelo 3D de esta categoría.</p>';
+              if (loader && current === i) loader.innerHTML = FILE_MODE ? FILE_MSG : '<p style="padding:20px;text-align:center">No se pudo cargar el modelo 3D de esta categoría.</p>';
             });
             Array.prototype.forEach.call(lineBtns.children, function (b, bi) { b.classList.toggle('active', bi === i); });
             spTitle.style.opacity = 0; spDesc.style.opacity = 0;
