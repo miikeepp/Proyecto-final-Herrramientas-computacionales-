@@ -134,3 +134,17 @@ Para que el tablero cargue los datos nuevos:
 - **Periodo:** 2005 solo tiene datos de enero a mayo, por eso la comparación anual usa ese mismo periodo.
 - **Territorio:** `territory` es la oficina comercial que atiende al cliente, no su ubicación geográfica. Por eso Filipinas y parte de Singapur aparecen en "Japan".
 - **Moneda:** no está documentada en el dataset.
+
+## PostgreSQL
+
+`postgresql/modelo_retail.sql` carga los datos limpios (`data/clean/sales_clean.csv`) en el esquema `retail`:
+
+- `ventas_limpias`: tabla plana tal como sale del ETL (2.823 filas).
+- Modelo estrella: `fact_ventas` con `dim_cliente` (92), `dim_producto` (109) y `dim_fecha` (877 días).
+
+```powershell
+createdb -U postgres retail
+psql -U postgres -d retail -f postgresql/modelo_retail.sql
+```
+
+También se puede abrir en pgAdmin (Query Tool) y ejecutar. El script borra y recrea el esquema, así que se puede correr varias veces.
