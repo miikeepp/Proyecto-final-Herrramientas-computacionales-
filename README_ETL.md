@@ -13,6 +13,12 @@ El proceso lee `sales_data_sample.csv` sin modificarlo y crea:
 - `data/validation/validation_summary.json`: conteos y controles de validación.
 - `data/validation/duplicate_key_conflicts.jsonl`: posibles claves `(ORDERNUMBER, ORDERLINENUMBER)` repetidas con contenido diferente. Estas filas no se eliminan.
 
+## Tecnologías utilizadas
+
+- **Python + PySpark:** orquesta la lectura, normalización, validación y generación de archivos.
+- **Spark SQL:** las conversiones y las banderas de calidad están en `transformaciones_etl.sql`, ejecutado por PySpark sobre una vista temporal.
+- **Power Query:** `power_query/sales_clean.pq` carga el CSV limpio, asigna tipos para análisis y conserva únicamente las ventas realizadas. En Power BI o Excel, abra el Editor avanzado, pegue el contenido y reemplace `RutaArchivo` por la ruta absoluta de este proyecto. Ejecute antes `python etl_pyspark.py` para actualizar el CSV.
+
 La salida se entrega como JSONL porque el entorno Windows disponible no incluye `winutils.exe`, requisito del escritor Parquet de Spark. Las transformaciones y validaciones se ejecutan con PySpark; al instalar Hadoop/winutils compatible se puede cambiar el destino a Parquet sin alterar las reglas.
 
 ## Regla de ventas realizadas

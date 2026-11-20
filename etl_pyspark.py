@@ -17,6 +17,7 @@ OUTPUT = ROOT / "data" / "clean" / "sales_clean.jsonl"
 CSV_OUTPUT = ROOT / "data" / "clean" / "sales_clean.csv"
 VALIDATION = ROOT / "data" / "validation" / "validation_summary.json"
 CONFLICTS = ROOT / "data" / "validation" / "duplicate_key_conflicts.jsonl"
+SQL_TRANSFORM = ROOT / "transformaciones_etl.sql"
 
 SOURCE_COLUMNS = [
     "ORDERNUMBER", "QUANTITYORDERED", "PRICEEACH", "ORDERLINENUMBER",
@@ -82,35 +83,9 @@ def main() -> None:
     print(f"Filas de entrada: {input_rows}", flush=True)
     normalized = raw.select(*[nonblank(name).alias(name) for name in SOURCE_COLUMNS])
 
-    typed = normalized.select(
-        F.expr("try_cast(ORDERNUMBER as int)").alias("order_number"),
-        F.expr("try_cast(QUANTITYORDERED as int)").alias("quantity_ordered"),
-        F.expr("try_cast(PRICEEACH as decimal(12,2))").alias("price_each"),
-        F.expr("try_cast(ORDERLINENUMBER as int)").alias("order_line_number"),
-        F.expr("try_cast(SALES as decimal(14,2))").alias("sales"),
-        F.expr("try_to_timestamp(ORDERDATE, 'M/d/yyyy H:mm')").alias("order_timestamp"),
-        F.col("STATUS").alias("status"),
-        F.expr("try_cast(QTR_ID as int)").alias("source_quarter_id"),
-        F.expr("try_cast(MONTH_ID as int)").alias("source_month_id"),
-        F.expr("try_cast(YEAR_ID as int)").alias("source_year_id"),
-        F.col("PRODUCTLINE").alias("product_line"),
-        F.expr("try_cast(MSRP as decimal(12,2))").alias("msrp"),
-        F.col("PRODUCTCODE").alias("product_code"),
-        F.col("CUSTOMERNAME").alias("customer_name"),
-        F.col("PHONE").alias("phone"), F.col("ADDRESSLINE1").alias("address_line_1"),
-        F.col("ADDRESSLINE2").alias("address_line_2"), F.col("CITY").alias("city"),
-        F.col("STATE").alias("state"), F.col("POSTALCODE").alias("postal_code"),
-        F.col("COUNTRY").alias("country"), F.col("TERRITORY").alias("territory"),
-        F.col("CONTACTLASTNAME").alias("contact_last_name"),
-        F.col("CONTACTFIRSTNAME").alias("contact_first_name"), F.col("DEALSIZE").alias("deal_size"),
-        invalid(F.col("ORDERNUMBER"), F.expr("try_cast(ORDERNUMBER as int)")).alias("invalid_order_number"),
-        invalid(F.col("ORDERLINENUMBER"), F.expr("try_cast(ORDERLINENUMBER as int)")).alias("invalid_order_line_number"),
-        invalid(F.col("QUANTITYORDERED"), F.expr("try_cast(QUANTITYORDERED as int)")).alias("invalid_quantity"),
-        invalid(F.col("PRICEEACH"), F.expr("try_cast(PRICEEACH as decimal(12,2))")).alias("invalid_price_each"),
-        invalid(F.col("SALES"), F.expr("try_cast(SALES as decimal(14,2))")).alias("invalid_sales"),
-        invalid(F.col("ORDERDATE"), F.expr("try_to_timestamp(ORDERDATE, 'M/d/yyyy H:mm')")).alias("invalid_order_date"),
-        invalid(F.col("MSRP"), F.expr("try_cast(MSRP as decimal(12,2))")).alias("invalid_msrp"),
-    )
+    # SQL de Spark: mantiene las reglas de tipado y calidad visibles y reutilizables.
+    normalized.createOrReplaceTempView("ventas_normalizadas")
+    typed = spark.sql(SQL_TRANSFORM.read_text(encoding="utf-8"))
 
     clean_with_flags = typed.withColumn(
         "has_quality_error", F.expr("invalid_order_number OR invalid_order_line_number OR invalid_quantity OR invalid_price_each OR invalid_sales OR invalid_order_date OR invalid_msrp")

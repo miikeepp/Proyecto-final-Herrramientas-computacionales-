@@ -21,5 +21,17 @@ datos a nivel cliente, tablas descriptivas, diagnósticos, resultados de Levene,
 ANOVA clásico, eta cuadrado y Welch ANOVA en `data/analysis/anova/`, junto con
 histogramas, un diagrama de caja y gráficos Q–Q.
 
+## Hipótesis y decisión
+
+- **H₀:** el importe promedio por pedido de los clientes es igual en todas las regiones analizadas.
+- **H₁:** al menos una región tiene un importe promedio por pedido diferente.
+- **Nivel de significancia:** α = 0,05.
+
+El script escribe `anova_conclusion.txt` con la decisión basada en el p-valor del
+ANOVA clásico. Solo si `p < 0,05`, genera `tukey_hsd_results.csv`: allí aparecen
+las comparaciones por pares de regiones y sus p-valores ajustados. Si `p ≥ 0,05`,
+no se ejecuta Tukey porque no hay evidencia global suficiente para buscar pares
+que difieran.
+
 Los resultados se calculan desde el CSV limpio; no están codificados como
 constantes en el script.

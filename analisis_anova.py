@@ -10,6 +10,9 @@ from scipy import stats
 ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT / "data" / "clean" / "sales_clean.csv"
 OUTPUT = ROOT / "data" / "analysis" / "anova"
+ALPHA = 0.05
+H0 = "El importe promedio por pedido de los clientes es igual en todas las regiones analizadas."
+H1 = "Al menos una región tiene un importe promedio por pedido de los clientes diferente."
 
 
 def write_csv(path, rows, fieldnames):
@@ -17,6 +20,10 @@ def write_csv(path, rows, fieldnames):
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def write_text(path, content):
+    path.write_text(content + "\n", encoding="utf-8")
 
 
 def welch_anova(groups):
@@ -94,6 +101,22 @@ def main():
     eta_squared = ss_between / ss_total
     welch_stat, welch_df1, welch_df2, welch_p = welch_anova(groups)
 
+    # Tukey se aplica únicamente tras rechazar H0 con el ANOVA clásico.
+    # Identifica cuáles pares de regiones explican la diferencia global.
+    tukey_rows = []
+    if classic_p < ALPHA:
+        tukey = stats.tukey_hsd(*groups.values())
+        names = list(groups)
+        for left_index, left_name in enumerate(names):
+            for right_index in range(left_index + 1, len(names)):
+                tukey_rows.append({
+                    "region_1": left_name,
+                    "region_2": names[right_index],
+                    "difference_of_means": tukey.statistic[left_index, right_index],
+                    "p_value_adjusted": tukey.pvalue[left_index, right_index],
+                    "significant_at_alpha": tukey.pvalue[left_index, right_index] < ALPHA,
+                })
+
     write_csv(OUTPUT / "customer_level_data.csv", customer_rows, ["customer_name", "territory", "orders", "avg_sales_per_order"])
     write_csv(OUTPUT / "descriptive_by_region.csv", descriptive, list(descriptive[0]))
     write_csv(OUTPUT / "diagnostics.csv", diagnostics, list(diagnostics[0]))
@@ -103,6 +126,26 @@ def main():
         {"test": "Welch_ANOVA", "statistic": welch_stat, "df1": welch_df1, "df2": welch_df2, "p_value": welch_p, "effect_eta_squared": ""},
     ]
     write_csv(OUTPUT / "anova_results.csv", results, list(results[0]))
+    if tukey_rows:
+        write_csv(OUTPUT / "tukey_hsd_results.csv", tukey_rows, list(tukey_rows[0]))
+
+    conclusion = (
+        f"Hipótesis nula (H0): {H0}\n"
+        f"Hipótesis alternativa (H1): {H1}\n"
+        f"Nivel de significancia: α = {ALPHA:.2f}\n"
+        f"ANOVA clásico: F = {classic_stat:.4f}; p = {classic_p:.4f}.\n"
+    )
+    if classic_p < ALPHA:
+        conclusion += (
+            "Decisión: se rechaza H0. Hay evidencia de que al menos una media regional difiere.\n"
+            "Se generó tukey_hsd_results.csv para identificar los pares de regiones diferentes."
+        )
+    else:
+        conclusion += (
+            "Decisión: no se rechaza H0. No hay evidencia suficiente para afirmar "
+            "diferencias entre las medias regionales; Tukey HSD no se aplica."
+        )
+    write_text(OUTPUT / "anova_conclusion.txt", conclusion)
 
     names, values = list(groups), list(groups.values())
     fig, axes = plt.subplots(2, 2, figsize=(12, 8), constrained_layout=True)
@@ -126,8 +169,11 @@ def main():
     fig.savefig(OUTPUT / "qq_plots_by_region.png", dpi=160); plt.close(fig)
 
     print(f"Clientes analizados: {len(customer_rows)}")
+    print(f"H0: {H0}")
+    print(f"H1: {H1}")
     print(f"ANOVA clásico: F={classic_stat:.4f}, p={classic_p:.4f}, eta²={eta_squared:.4f}")
     print(f"ANOVA de Welch: F={welch_stat:.4f}, p={welch_p:.4f}")
+    print("Decisión: " + ("se rechaza H0; revisar Tukey HSD." if classic_p < ALPHA else "no se rechaza H0; Tukey HSD no es necesario."))
     print(f"Resultados: {OUTPUT}")
 
 

@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Análisis de ventas con Python, PySpark y Power BI.">
+  <title>Análisis de ventas | Michael David Lagos Rosero</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink:#0f2744; --muted:#5a7188; --navy:#081626; --navy2:#102a45;
+      --blue:#1d6fa5; --teal:#0ea5a0; --teal-deep:#087777;
+      --paper:#f5f8fb; --card:#ffffff; --line:#dde6ef; --accent:#f2b84b;
+      --radius:18px;
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; font-size:18px; }
+    body { margin:0; font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--paper); line-height:1.65; -webkit-font-smoothing:antialiased; }
+    a { color:inherit; }
+    h1,h2,h3 { font-family:Sora,Inter,sans-serif; }
+    .wrap { width:min(1480px, calc(100% - 56px)); margin:auto; }
+
+    /* Nav */
+    .site-nav { position:sticky; top:0; z-index:50; background:rgba(8,22,38,.88); backdrop-filter:blur(10px); border-bottom:1px solid rgba(255,255,255,.08); }
+    .site-nav .wrap { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:16px 0; }
+    .brand { font-family:Sora,sans-serif; font-weight:800; font-size:1rem; color:#fff; text-decoration:none; letter-spacing:.01em; }
+    .nav-links { display:flex; flex-wrap:wrap; gap:26px; font-size:1rem; font-weight:600; }
+    .nav-links a { color:#cfe6ef; text-decoration:none; padding-bottom:3px; border-bottom:2px solid transparent; }
+    .nav-links a:hover { color:#fff; border-color:var(--accent); }
+
+    /* Hero */
+    .hero { position:relative; overflow:hidden; color:#fff; background:linear-gradient(150deg,var(--navy) 0%,var(--navy2) 55%,#0d3a52 100%); padding:72px 0 86px; }
+    .hero::before { content:""; position:absolute; top:-120px; right:-100px; width:520px; height:520px; border-radius:50%; background:radial-gradient(circle,rgba(14,165,160,.35),transparent 70%); }
+    .hero::after { content:""; position:absolute; bottom:-160px; left:-120px; width:420px; height:420px; border-radius:50%; background:radial-gradient(circle,rgba(242,184,75,.16),transparent 70%); }
+    .hero-grid { position:relative; }
+    .eyebrow { display:inline-flex; align-items:center; gap:8px; color:#9ae6e6; font-size:.82rem; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+    .eyebrow::before { content:""; width:20px; height:2px; background:var(--accent); display:inline-block; }
+    h1 { margin:18px 0 22px; max-width:760px; font-size:clamp(2.4rem,5.4vw,4.7rem); line-height:1.06; letter-spacing:-.03em; font-weight:800; }
+    .lead { max-width:680px; color:#dcecf2; font-size:1.3rem; line-height:1.55; }
+    .jump { display:inline-flex; margin-top:28px; padding:16px 24px; border-radius:11px; background:var(--accent); color:#2c1f00; font-weight:800; font-size:1.05rem; text-decoration:none; box-shadow:0 10px 25px rgba(242,184,75,.25); }
+    .jump:hover { filter:brightness(1.04); }
+
+    main { padding:64px 0 90px; }
+    section { margin:0 0 84px; scroll-margin-top:90px; }
+    .section-num { display:block; font-family:Sora,sans-serif; font-weight:800; font-size:.85rem; letter-spacing:.14em; color:var(--teal-deep); margin-bottom:10px; }
+    .section-head { display:flex; justify-content:space-between; align-items:end; gap:24px; margin-bottom:28px; }
+    h2 { font-size:clamp(1.9rem,3.3vw,2.7rem); letter-spacing:-.025em; line-height:1.15; margin:0; font-weight:800; }
+    .section-head p { margin:0; max-width:520px; color:var(--muted); font-size:1.08rem; }
+
+    /* Dashboard */
+    .dashboard { overflow:hidden; border:1px solid var(--line); border-radius:20px; background:var(--card); box-shadow:0 18px 44px rgba(20,50,75,.12); }
+    .dashboard-top { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 24px; background:#fff; border-bottom:1px solid var(--line); }
+    .dashboard-top strong { font-size:1.05rem; }
+    .live { display:flex; align-items:center; gap:9px; font-size:.95rem; font-weight:700; color:#176b56; }
+    .dot { width:10px; height:10px; border-radius:50%; background:#25b58b; box-shadow:0 0 0 5px #d9f5eb; }
+    .dashboard iframe { display:block; width:100%; height:760px; border:0; background:#eef3f7; }
+    .report-stage { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(320px,.8fr); align-items:stretch; overflow:hidden; border:1px solid var(--line); border-radius:20px; background:var(--card); box-shadow:0 18px 44px rgba(20,50,75,.12); }
+    .report-stage .dashboard { border:0; border-radius:0; box-shadow:none; }
+    .page-guide { display:flex; flex-direction:column; height:760px; overflow-y:auto; border-left:1px solid var(--line); background:#fff; }
+    .guide-label { margin:0; padding:26px 26px 8px; color:var(--teal-deep); font-size:.85rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+    .guide-copy { padding:0 26px 22px; }
+    .guide-copy h3 { margin:0 0 12px; font-size:1.65rem; line-height:1.2; font-weight:700; }
+    .guide-copy p { margin:0; color:#3f5a71; font-size:1.08rem; }
+    .guide-points { margin:18px 0 0; padding:0; list-style:none; }
+    .guide-points li { position:relative; margin:11px 0; padding-left:22px; font-size:1.02rem; color:#304d64; line-height:1.4; }
+    .guide-points li::before { content:""; position:absolute; left:0; top:.5em; width:9px; height:9px; border-radius:50%; background:var(--accent); }
+    .general-insights { margin:0 26px 20px; padding-top:4px; }
+    .general-insights[hidden] { display:none; }
+    .general-insights h4 { margin:17px 0 9px; color:var(--teal-deep); font:800 .82rem/1.25 Sora,sans-serif; letter-spacing:.08em; text-transform:uppercase; }
+    .general-insights h4:first-child { margin-top:0; }
+    .general-insights ul { margin:0; padding-left:19px; color:#304d64; font-size:.9rem; line-height:1.45; }
+    .general-insights li + li { margin-top:9px; }
+    .general-insights details { margin-top:18px; border:1px solid #cfe1e8; border-radius:10px; background:#f8fcfd; overflow:hidden; }
+    .general-insights summary { padding:12px 14px; color:#123f58; cursor:pointer; font-weight:800; font-size:.92rem; }
+    .dax-content { padding:0 14px 14px; }
+    .dax-content p { margin:12px 0; color:#3f5a71; font-size:.88rem; line-height:1.45; }
+    .dax-content pre { margin:10px 0 14px; padding:12px; overflow:auto; border-radius:8px; background:#102a45; color:#e6f7fb; font:500 .74rem/1.45 ui-monospace,SFMono-Regular,Consolas,monospace; white-space:pre; }
+    .capture-note { margin:17px 0 0; padding:12px 14px; border-left:3px solid var(--accent); border-radius:5px; background:#fff9e9; color:#5a4b26; font-size:.88rem; line-height:1.45; }
+    .comparison-table { width:100%; margin:14px 0; border-collapse:collapse; color:#304d64; font-size:.82rem; line-height:1.35; }
+    .comparison-table th,.comparison-table td { padding:9px 7px; border-bottom:1px solid var(--line); text-align:left; }
+    .comparison-table th { color:#123f58; font-weight:800; }
+    .comparison-table td:nth-child(2),.comparison-table td:nth-child(3) { text-align:right; white-space:nowrap; }
+    .page-tabs { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; margin:0 18px 18px; padding-top:12px; }
+    .page-tab { min-height:52px; padding:9px 11px; border:1px solid var(--line); border-radius:9px; color:#49677d; background:#fff; cursor:pointer; font:700 .85rem/1.2 Inter,sans-serif; text-align:left; transition:border-color .15s,color .15s,background .15s; }
+    .page-tab:hover,.page-tab:focus-visible { border-color:var(--teal); color:var(--teal-deep); outline:none; }
+    .page-tab.active { color:#fff; background:var(--teal); border-color:var(--teal); box-shadow:0 6px 16px rgba(14,165,160,.3); }
+    .notice { margin:18px 0 0; padding:16px 20px; border-left:4px solid var(--accent); border-radius:6px; color:#4b5563; background:#fff9e9; font-size:1.02rem; line-height:1.5; }
+
+    .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; counter-reset:steps; }
+    .step { position:relative; min-height:235px; padding:28px; border:1px solid var(--line); border-radius:16px; background:var(--card); box-shadow:0 8px 22px rgba(20,50,75,.06); transition:transform .18s, box-shadow .18s; }
+    .step:hover { transform:translateY(-3px); box-shadow:0 14px 30px rgba(20,50,75,.1); }
+    .step::before { counter-increment:steps; content:"0" counter(steps); display:grid; place-items:center; width:46px; height:46px; margin-bottom:20px; border-radius:50%; background:#d9f4f4; color:var(--teal-deep); font-family:Sora,sans-serif; font-weight:800; font-size:1.05rem; }
+    .step h3 { margin:0 0 10px; font-size:1.2rem; font-weight:700; }
+    .step p { margin:0; color:var(--muted); font-size:1.03rem; }
+
+    /* Analytic requirements */
+    .requirements { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .requirement { padding:24px 25px; border:1px solid var(--line); border-radius:16px; background:var(--card); box-shadow:0 7px 20px rgba(20,50,75,.05); }
+    .requirement-top { display:flex; align-items:flex-start; gap:14px; margin-bottom:12px; }
+    .requirement-num { flex:0 0 auto; display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:#d9f4f4; color:var(--teal-deep); font-family:Sora,sans-serif; font-size:.9rem; font-weight:800; }
+    .requirement h3 { margin:3px 0 0; font-size:1.16rem; line-height:1.25; }
+    .requirement p { margin:0; color:var(--muted); font-size:1rem; line-height:1.55; }
+    .requirement strong { color:var(--ink); }
+    .requirement.limit { border-color:#efd79b; background:#fffdf7; }
+    .requirement.limit .requirement-num { background:#fff0c9; color:#825a08; }
+
+    .results { display:grid; grid-template-columns:1.25fr .75fr; gap:24px; }
+    .panel { padding:32px; border-radius:var(--radius); background:var(--card); border:1px solid var(--line); box-shadow:0 8px 22px rgba(20,50,75,.06); }
+    .panel h3 { margin-top:0; font-size:1.3rem; font-weight:700; }
+    .metrics { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+    .metric { padding:18px; border-radius:12px; background:#eef7fa; }
+    .metric b { display:block; font-size:1.65rem; font-weight:800; letter-spacing:-.02em; color:#075a7c; }
+    .metric span { display:block; margin-top:5px; color:var(--muted); font-size:.92rem; }
+    .anova { background:linear-gradient(140deg,#0d526b,#0a3554); color:#eefcff; }
+    .anova p { color:#cce8f3; font-size:1.05rem; }
+    .pvalue { font-size:2.9rem; font-weight:800; color:#8fe5de; letter-spacing:-.03em; font-family:Sora,sans-serif; }
+    .anova-layout { display:grid; grid-template-columns:1.15fr .85fr; gap:24px; }
+    .anova-summary { padding:30px; border-radius:var(--radius); border:1px solid var(--line); background:var(--card); box-shadow:0 8px 22px rgba(20,50,75,.06); }
+    .anova-summary h3 { margin:0 0 12px; font-size:1.35rem; }
+    .anova-summary p { margin:0 0 16px; color:var(--muted); }
+    .anova-steps { margin:0; padding-left:22px; color:#304d64; font-size:1rem; }
+    .anova-steps li + li { margin-top:9px; }
+    .anova-result { padding:30px; border-radius:var(--radius); background:linear-gradient(140deg,#0d526b,#0a3554); color:#eefcff; box-shadow:0 10px 26px rgba(20,80,110,.18); }
+    .anova-result h3 { margin:0 0 13px; font-size:1.35rem; }
+    .anova-result p { color:#d7f3f3; margin:0 0 16px; }
+    .anova-sample { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:18px 0; }
+    .anova-sample div { padding:12px; border-radius:9px; background:rgba(255,255,255,.1); }
+    .anova-sample b { display:block; color:#8fe5de; font-size:1.2rem; }
+    .anova-sample span { display:block; color:#d7f3f3; font-size:.83rem; }
+    .anova-table-wrap { margin-top:24px; padding:26px; overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); box-shadow:0 8px 22px rgba(20,50,75,.06); }
+    .anova-table-wrap h3 { margin:0 0 10px; font-size:1.3rem; }
+    .anova-table { width:100%; min-width:600px; border-collapse:collapse; color:#304d64; }
+    .anova-table th,.anova-table td { padding:13px 12px; border-bottom:1px solid var(--line); text-align:left; }
+    .anova-table th { color:#123f58; background:#eef7fa; font-weight:800; }
+    .anova-table td:nth-child(2),.anova-table td:nth-child(4) { text-align:right; font-variant-numeric:tabular-nums; }
+    .anova-details { margin-top:24px; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); overflow:hidden; box-shadow:0 8px 22px rgba(20,50,75,.06); }
+    .anova-details summary { padding:20px 24px; color:#123f58; cursor:pointer; font:800 1.05rem/1.3 Sora,sans-serif; }
+    .anova-details .dax-content { padding:0 24px 24px; }
+    .anova-visuals { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin-top:24px; }
+    .anova-figure { margin:0; overflow:hidden; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); box-shadow:0 8px 22px rgba(20,50,75,.06); }
+    .anova-figure.wide { grid-column:1 / -1; }
+    .anova-figure img { display:block; width:100%; height:auto; background:#fff; }
+    .anova-figure figcaption { padding:20px 22px 22px; color:#3f5a71; font-size:.96rem; line-height:1.5; }
+    .anova-figure figcaption strong { display:block; margin-bottom:7px; color:#123f58; font-family:Sora,sans-serif; font-size:1.05rem; }
+
+    .script { display:grid; grid-template-columns:.85fr 1.15fr; gap:24px; }
+    .script-intro { padding:32px; border-radius:var(--radius); color:#fff; background:linear-gradient(150deg,var(--blue),#0d4f6e); box-shadow:0 10px 26px rgba(20,80,110,.2); }
+    .script-intro h3 { font-size:1.5rem; margin:8px 0 14px; font-weight:700; }
+    .script-intro p { color:#d7f3f3; font-size:1.05rem; }
+    .talk { display:grid; gap:13px; }
+    .talk div { padding:18px 20px; border-left:4px solid var(--teal); border-radius:0 11px 11px 0; background:#fff; color:#2e4b63; font-size:1.07rem; line-height:1.5; box-shadow:0 3px 10px rgba(20,50,75,.05); }
+    .talk b { color:var(--ink); }
+
+    footer { padding:34px 0; color:#b9d2df; background:var(--navy); font-size:.95rem; }
+
+    @media (max-width:900px) {
+      .report-stage { grid-template-columns:1fr; }
+      .page-guide { border:0; border-top:1px solid var(--line); }
+      .guide-copy { padding-bottom:14px; }
+      .page-tabs { margin-top:0; }
+    }
+    @media (max-width:800px) {
+      html { font-size:17px; }
+      .hero { padding:52px 0 54px; }
+      .hero-grid,.results,.script,.anova-layout { grid-template-columns:1fr; gap:26px; }
+      .steps { grid-template-columns:repeat(2,1fr); }
+      .requirements { grid-template-columns:1fr; }
+      .anova-visuals { grid-template-columns:1fr; }
+      .dashboard iframe { height:580px; }
+      .page-guide { height:580px; }
+    }
+    @media (max-width:540px) {
+      .wrap { width:min(100% - 24px, 1480px); }
+      .site-nav .wrap { align-items:flex-start; flex-direction:column; gap:10px; }
+      .nav-links { gap:14px; }
+      .steps,.metrics { grid-template-columns:1fr; }
+      .section-head { display:block; }
+      .section-head p { margin-top:12px; }
+      .dashboard iframe { height:480px; }
+      .page-guide { height:auto; max-height:680px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="site-nav">
+    <nav class="wrap" aria-label="Navegación principal">
+      <a class="brand" href="#inicio">Ventas · PySpark + Power BI</a>
+      <div class="nav-links"><a href="#etl">ETL</a><a href="#tablero">Tablero</a><a href="#requerimientos">Requerimientos</a><a href="#hallazgos">Resultados</a><a href="#anova-region">ANOVA</a></div>
+    </nav>
+  </div>
+
+  <header class="hero" id="inicio">
+    <div class="wrap">
+      <div class="hero-grid">
+        <div>
+          <span class="eyebrow">Proyecto académico · Ingeniería de Software</span>
+          <h1>Análisis de ventas, desde el dato hasta la decisión.</h1>
+          <p class="lead">Proyecto académico · Universidad Cooperativa de Colombia, Campus Pasto.</p>
+          <p class="lead"><strong>Integrantes:</strong> Michael David Lagos Rosero · Nicolás Alejandro Bastidas · Julio Esteban Bolaños · Ronald Felipe Benavides.</p>
+          <p class="lead">Transformación con Python y PySpark, análisis estadístico y visualización interactiva con Power BI.</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="etl" aria-labelledby="etl-title">
+      <div class="section-head">
+        <div><span class="section-num">01 · PROCESO ETL</span><h2 id="etl-title">Preparación y limpieza de los datos</h2></div>
+        <p>Antes de construir el tablero, los datos de ventas se extrajeron, transformaron y validaron con PySpark.</p>
+      </div>
+      <div class="steps">
+        <article class="step"><h3>Extracción</h3><p>Se leyó <code>sales_data_sample.csv</code> sin modificar el archivo original, usando codificación ISO-8859-1. Se conservaron todas las filas y estados de pedido durante la limpieza.</p></article>
+        <article class="step"><h3>Limpieza</h3><p>Se quitaron espacios externos y las cadenas vacías se convirtieron en nulos. Las conversiones de números y fechas se hicieron con <code>try_cast</code>; los valores inválidos quedaron marcados para revisión.</p></article>
+        <article class="step"><h3>Transformación</h3><p>Se asignaron tipos a ventas, cantidades y precios; además se derivaron fecha, año, mes y trimestre. La bandera <code>es_venta_realizada</code> identifica las filas con estado <code>Shipped</code>.</p></article>
+        <article class="step"><h3>Validación</h3><p>Solo se eliminaron duplicados exactos. Las claves repetidas con contenido diferente se conservaron y se reportaron para no perder información. <code>SALES</code> se mantuvo como el importe oficial.</p></article>
+        <article class="step"><h3>Carga</h3><p>La capa limpia se generó en <code>sales_clean.csv</code> para Power BI y en JSONL. También se creó un resumen de validación con conteos, nulos y controles de calidad.</p></article>
+        <article class="step"><h3>Regla de análisis</h3><p>Las métricas principales filtran pedidos <code>Shipped</code>. No se infieren costos, descuentos ni canales: el dataset no contiene esos campos de forma explícita.</p></article>
+      </div>
+      <details class="anova-details" aria-label="Código del proceso ETL">
+        <summary>Metodología y código ETL (Python, Spark SQL y Power Query)</summary>
+        <div class="dax-content">
+          <p><strong>Python y PySpark:</strong> <code>etl_pyspark.py</code> lee el origen, normaliza los valores vacíos y ejecuta las reglas definidas en Spark SQL.</p>
+          <pre><code>from pathlib import Path
+from pyspark.sql import SparkSession, functions as F, types as T
+
+ROOT = Path(__file__).resolve().parent
+SOURCE = ROOT / "sales_data_sample.csv"
+SQL_TRANSFORM = ROOT / "transformaciones_etl.sql"
+
+spark = (SparkSession.builder.master("local[1]")
+    .appName("sales-cleaning").config("spark.ui.enabled", "false")
+    .getOrCreate())
+
+raw_schema = T.StructType([
+    T.StructField(name, T.StringType(), True) for name in SOURCE_COLUMNS
+])
+raw = (spark.read.option("header", True).option("encoding", "ISO-8859-1")
+    .option("mode", "PERMISSIVE").schema(raw_schema).csv(str(SOURCE)))
+
+normalized = raw.select(*[nonblank(name).alias(name) for name in SOURCE_COLUMNS])
+normalized.createOrReplaceTempView("ventas_normalizadas")
+typed = spark.sql(SQL_TRANSFORM.read_text(encoding="utf-8"))
+
+clean = (typed
+    .withColumn("has_quality_error", F.expr("invalid_order_number OR invalid_order_line_number OR invalid_quantity OR invalid_price_each OR invalid_sales OR invalid_order_date OR invalid_msrp"))
+    .withColumn("es_venta_realizada", F.col("status") == F.lit("Shipped"))
+    .withColumn("order_date", F.to_date("order_timestamp"))
+    .withColumn("year", F.year("order_timestamp"))
+    .withColumn("month", F.month("order_timestamp"))
+    .withColumn("quarter", F.quarter("order_timestamp")))</code></pre>
+          <p><strong>Spark SQL:</strong> <code>transformaciones_etl.sql</code> convierte los datos y marca cada conversión inválida para auditoría.</p>
+          <pre><code>SELECT
+    TRY_CAST(ORDERNUMBER AS INT) AS order_number,
+    TRY_CAST(QUANTITYORDERED AS INT) AS quantity_ordered,
+    TRY_CAST(PRICEEACH AS DECIMAL(12,2)) AS price_each,
+    TRY_CAST(SALES AS DECIMAL(14,2)) AS sales,
+    TRY_TO_TIMESTAMP(ORDERDATE, 'M/d/yyyy H:mm') AS order_timestamp,
+    STATUS AS status,
+    ORDERNUMBER IS NOT NULL AND
+        TRY_CAST(ORDERNUMBER AS INT) IS NULL AS invalid_order_number,
+    SALES IS NOT NULL AND
+        TRY_CAST(SALES AS DECIMAL(14,2)) IS NULL AS invalid_sales,
+    ORDERDATE IS NOT NULL AND
+        TRY_TO_TIMESTAMP(ORDERDATE, 'M/d/yyyy H:mm') IS NULL AS invalid_order_date
+FROM ventas_normalizadas;</code></pre>
+          <p><strong>Power Query:</strong> tras ejecutar el ETL, Power BI carga <code>sales_clean.csv</code>, asigna tipos y filtra las ventas realizadas.</p>
+          <pre><code>let
+    RutaArchivo = "C:\\RUTA_DEL_PROYECTO\\data\\clean\\sales_clean.csv",
+    Fuente = Csv.Document(File.Contents(RutaArchivo),
+        [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+    Encabezados = Table.PromoteHeaders(Fuente, [PromoteAllScalars = true]),
+    Tipos = Table.TransformColumnTypes(Encabezados, {
+        {"sales", Currency.Type}, {"order_date", type date},
+        {"year", Int64.Type}, {"month", Int64.Type},
+        {"es_venta_realizada", type logical}
+    }),
+    VentasRealizadas = Table.SelectRows(Tipos,
+        each [es_venta_realizada] = true)
+in
+    VentasRealizadas</code></pre>
+          <p><strong>Resultado:</strong> se conserva la capa limpia completa, se reportan problemas de calidad y Power BI calcula métricas solamente con pedidos enviados.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="tablero">
+      <div class="section-head">
+        <div><span class="section-num">02 · TABLERO</span><h2>Tablero interactivo</h2></div>
+        <p>Explora las siete páginas del informe. Los filtros y gráficos se recalculan dentro de Power BI.</p>
+      </div>
+      <div class="report-stage">
+        <div class="dashboard">
+          <div class="dashboard-top"><strong>Taller final · Informe de ventas</strong><span class="live"><i class="dot"></i> Interactivo</span></div>
+          <iframe id="powerbi-report" title="Taller final — Informe interactivo de ventas" src="https://app.powerbi.com/view?r=eyJrIjoiN2ZkM2NhNDItOTI5MC00MGViLWE0MmYtMzY4MTYyZTA5NGY2IiwidCI6IjhkMzY4MzZlLTZiNzUtNGRlNi1iYWI5LTVmNGIxNzc1NDI3ZiIsImMiOjR9" allowfullscreen loading="lazy"></iframe>
+        </div>
+        <aside class="page-guide" aria-live="polite" aria-label="Explicación de la página actual">
+          <p class="guide-label" id="guide-number">Página 1 de 7</p>
+          <div class="guide-copy">
+            <h3 id="guide-title">Ventas mensuales por país</h3>
+            <p id="guide-description">Esta página responde principalmente cuánto se vendió cada mes por país. También apoya el ranking de clientes, el crecimiento mensual y la comparación con el mismo mes del año anterior.</p>
+            <ul class="guide-points" id="guide-points"><li>Requerimiento 1: ventas mensuales por país.</li><li>Apoya los requerimientos 3, 4 y 5.</li><li>La comparación enero–mayo entre años está en la página 6.</li></ul>
+          </div>
+          <div class="general-insights" id="general-insights">
+            <h4>Cómo leer los gráficos</h4>
+            <ul>
+              <li><strong>Ventas realizadas por country.</strong> Es el gráfico de barras por país. Cada barra suma <code>[Ventas realizadas]</code> para un <code>country</code>. Si se selecciona Philippines, queda una sola barra porque el filtro deja solo ese país.</li>
+              <li><strong>Ventas realizadas por AñoMes y country.</strong> Es el gráfico de líneas. El eje X es <code>Calendario[AñoMes]</code>, el eje Y es <code>[Ventas realizadas]</code> y la leyenda es <code>country</code>. Cada punto es el total vendido por un país en un mes; la línea solo une los meses que tienen datos visibles.</li>
+              <li><strong>Ventas realizadas por customer_name.</strong> Es el gráfico de barras de clientes. Agrupa <code>[Ventas realizadas]</code> por <code>customer_name</code> para identificar qué cliente generó más importe con los filtros activos.</li>
+              <li><strong>Tabla: crecimiento mensual.</strong> Resume el cambio de cada mes frente al mes calendario anterior: <code>(ventas actuales − ventas anteriores) / ventas anteriores</code>. Una celda vacía significa que no hay base comparable; no significa 0 %.</li>
+              <li><strong>Tabla: crecimiento interanual.</strong> Resume el cambio de cada mes frente al mismo mes del año anterior. Permite identificar aumentos o disminuciones respecto al periodo equivalente.</li>
+            </ul>
+            <details>
+              <summary>Código DAX y explicación</summary>
+              <div class="dax-content">
+                <pre><code>Ventas realizadas =
+CALCULATE(
+   SUM(sales_clean[sales]),
+   sales_clean[status] = "Shipped"
+)</code></pre>
+                <p><code>SUM</code> suma el importe de las líneas. <code>CALCULATE</code> limita la suma a <code>Shipped</code> y conserva el contexto de país y fecha aplicado en el informe.</p>
+                <pre><code>Ventas mes anterior =
+CALCULATE(
+   [Ventas realizadas],
+   DATEADD(Calendario[Date], -1, MONTH)
+)
+
+Crecimiento mensual % =
+VAR Actual = [Ventas realizadas]
+VAR Anterior = [Ventas mes anterior]
+RETURN
+   IF(
+       ISINSCOPE(Calendario[AñoMes]) &amp;&amp; NOT ISBLANK(Actual),
+       DIVIDE(Actual - Anterior, Anterior)
+   )</code></pre>
+                <p><code>Calendario</code> se relaciona de uno a muchos con <code>sales_clean</code> por fecha. <code>AñoMes</code> agrupa los datos en meses; junto con <code>country</code> y <code>[Ventas realizadas]</code> produce el total mensual por país. <code>DATEADD</code> desplaza un mes el periodo evaluado.</p>
+                <pre><code>Ventas año anterior =
+CALCULATE(
+   [Ventas realizadas],
+   SAMEPERIODLASTYEAR(Calendario[Date])
+)
+
+Crecimiento interanual % =
+VAR Actual = [Ventas realizadas]
+VAR Anterior = [Ventas año anterior]
+RETURN
+   IF(
+       ISINSCOPE(Calendario[AñoMes]) &amp;&amp; NOT ISBLANK(Actual),
+       DIVIDE(Actual - Anterior, Anterior)
+   )</code></pre>
+                <p><code>SAMEPERIODLASTYEAR</code> recupera el periodo equivalente del año anterior. Ambas tasas calculan <code>(actual − anterior) / anterior</code>; <code>ISINSCOPE</code> las deja en filas mensuales, <code>NOT ISBLANK</code> comprueba que haya valor actual y <code>DIVIDE</code> devuelve vacío si la base es cero o está vacía.</p>
+              </div>
+            </details>
+          </div>
+          <div class="general-insights" id="products-insights" hidden>
+            <h4>Ventas por categoría de producto</h4>
+            <ul>
+              <li><strong>Promedio de venta por año y región.</strong> Este gráfico compara el importe promedio de venta entre años y regiones. Permite ver si el valor promedio de las ventas cambia con el tiempo y si una región tiene transacciones promedio más altas que otra.</li>
+              <li><strong>Ventas realizadas por product_line.</strong> Es el gráfico de barras por categoría. El eje X usa <code>sales_clean[product_line]</code>: cada categoría tiene su propia barra. El eje Y usa <code>[Ventas realizadas]</code>: la altura de la barra representa el importe vendido en líneas con estado <code>Shipped</code>.</li>
+              <li><strong>Unidades vendidas.</strong> Este gráfico suma la cantidad de productos vendidos en las líneas de pedido. Sirve para distinguir categorías o regiones que venden más unidades de aquellas que generan un importe monetario mayor.</li>
+              <li><strong>¿Qué significa territory?</strong> <code>territory</code> es la zona comercial o geográfica amplia a la que pertenece cada venta, por ejemplo APAC, EMEA, Japan o NA. No es un país: agrupa varios países para poder compararlos como región. Al seleccionar un territorio, los tres gráficos se recalculan para esa zona.</li>
+              <li><strong>Resultado de referencia.</strong> Sin filtro territorial, <strong>Classic Cars</strong> lidera con <strong>3.701.760,33</strong> unidades monetarias. Es una cifra fija de referencia en este texto; las cifras del tablero cambian al aplicar filtros.</li>
+            </ul>
+            <details>
+              <summary>Código DAX y explicación</summary>
+              <div class="dax-content">
+                <pre><code>Ventas realizadas =
+CALCULATE(
+   SUM(sales_clean[sales]),
+   sales_clean[status] = "Shipped"
+)</code></pre>
+                <p><code>SUM</code> suma los importes de las líneas y <code>CALCULATE</code> aplica la condición <code>Shipped</code>. El eje <code>product_line</code> hace que Power BI evalúe esa misma medida para cada categoría. Si se selecciona un territorio, la medida también se evalúa dentro de ese filtro.</p>
+                <pre><code>EVALUATE
+SUMMARIZECOLUMNS(
+   sales_clean[product_line],
+   "Importe vendido", [Ventas realizadas]
+)
+ORDER BY [Importe vendido] DESC</code></pre>
+                <p>Esta consulta se puede ejecutar en la Vista de consultas DAX, siempre que exista la medida <code>[Ventas realizadas]</code>. Devuelve una tabla con una fila por categoría, ordenada de mayor a menor importe vendido, para comprobar los resultados en Power BI. El HTML solo muestra el código como referencia: no inventa una columna de costos ni usa <code>MSRP</code> como costo.</p>
+              </div>
+            </details>
+          </div>
+          <div class="general-insights" id="abc-insights" hidden>
+            <h4>Cómo leer la tabla</h4>
+            <ul>
+              <li><strong>customer_name.</strong> Identifica al cliente de cada fila.</li>
+              <li><strong>Ventas realizadas.</strong> Suma los importes de las líneas con estado <code>Shipped</code>.</li>
+              <li><strong>Ranking cliente.</strong> Da el puesto 1 al cliente con mayores ventas. Los empates comparten puesto y el siguiente puesto no se salta.</li>
+              <li><strong>Ventas acumuladas clientes.</strong> Suma las ventas desde el primer puesto hasta el cliente de la fila. Si hay empate, incluye a todos los clientes con ese mismo importe.</li>
+              <li><strong>Porcentaje acumulado clientes.</strong> Divide el importe acumulado entre las ventas totales de los clientes de la selección.</li>
+              <li><strong>Clasificación ABC.</strong> Asigna A hasta el 80 %, B por encima del 80 % y hasta el 95 %, y C por encima del 95 %. La regla usa el acumulado que ya incluye al cliente de esa fila.</li>
+              <li><strong>Tipo de nombre cliente.</strong> Indica si el texto del nombre contiene <code>Ltd</code>. Es una clasificación aparte: no interviene en el ranking ni en ABC.</li>
+            </ul>
+            <details>
+              <summary>Código DAX y explicación</summary>
+              <div class="dax-content">
+                <pre><code>Ventas realizadas =
+CALCULATE(
+   SUM(sales_clean[sales]),
+   sales_clean[status] = "Shipped"
+)
+
+Ranking cliente =
+IF(
+   ISINSCOPE(sales_clean[customer_name])
+       &amp;&amp; NOT ISBLANK([Ventas realizadas]),
+   RANKX(
+       ALLSELECTED(sales_clean[customer_name]),
+       [Ventas realizadas],
+       ,
+       DESC,
+       DENSE
+   )
+)</code></pre>
+                <pre><code>Ventas acumuladas clientes =
+VAR VentaActual = [Ventas realizadas]
+RETURN
+   IF(
+       ISINSCOPE(sales_clean[customer_name])
+           &amp;&amp; NOT ISBLANK(VentaActual),
+       SUMX(
+           FILTER(
+               ALLSELECTED(sales_clean[customer_name]),
+               [Ventas realizadas] &gt;= VentaActual
+           ),
+           [Ventas realizadas]
+       )
+   )
+
+Porcentaje acumulado clientes =
+VAR TotalClientes =
+   CALCULATE(
+       [Ventas realizadas],
+       ALLSELECTED(sales_clean[customer_name])
+   )
+RETURN
+   DIVIDE([Ventas acumuladas clientes], TotalClientes)</code></pre>
+                <pre><code>Clasificación ABC =
+VAR Porcentaje = [Porcentaje acumulado clientes]
+RETURN
+   IF(
+       NOT ISBLANK(Porcentaje),
+       SWITCH(
+           TRUE(),
+           Porcentaje &lt;= 0.80, "A",
+           Porcentaje &lt;= 0.95, "B",
+           "C"
+       )
+   )
+
+Tipo de nombre cliente =
+VAR Nombre = SELECTEDVALUE(sales_clean[customer_name])
+RETURN
+   IF(
+       NOT ISBLANK(Nombre),
+       IF(SEARCH("Ltd", Nombre, 1, 0) &gt; 0, "Contiene Ltd", "Sin Ltd")
+   )</code></pre>
+                <p><strong>Cómo se encadenan:</strong> 1. <code>SUM</code> y <code>CALCULATE</code> obtienen las ventas de líneas enviadas. 2. <code>RANKX</code> ordena de mayor a menor; <code>ALLSELECTED</code> compara la fila con los clientes de la selección. 3. <code>FILTER</code> identifica importes mayores o iguales al de la fila y <code>SUMX</code> los suma. 4. <code>DIVIDE</code> convierte el acumulado en proporción del total seleccionado y se presenta como porcentaje. 5. <code>SWITCH</code> aplica los cortes ABC; <code>SELECTEDVALUE</code> y <code>SEARCH</code> identifican <code>Ltd</code> por separado.</p>
+              </div>
+            </details>
+          </div>
+          <div class="general-insights" id="map-insights" hidden>
+            <h4>Cómo leer el mapa</h4>
+            <ul>
+              <li><strong>Ubicación.</strong> Usa <code>sales_clean[country]</code>. Cada burbuja representa un país.</li>
+              <li><strong>Tamaño.</strong> Usa <code>[Ventas realizadas]</code>. Una burbuja más grande indica un mayor importe de ventas de pedidos con estado <code>Shipped</code>.</li>
+              <li><strong>Información al pasar el cursor.</strong> El recuadro muestra país, ventas realizadas, ventas acumuladas del año (YTD), ventas acumuladas del mes (MTD), pedidos realizados y ticket promedio. En la captura de USA se ven cuatro indicadores: ventas realizadas, YTD, pedidos realizados y ticket promedio; MTD no aparece en ese recuadro.</li>
+              <li><strong>Lectura del caso USA.</strong> Las ventas realizadas visibles son <strong>3.372.204,28</strong>, repartidas en <strong>105</strong> pedidos enviados; el ticket promedio visible es <strong>32.116,23</strong> por pedido. Son valores de la captura y no se atribuyen a un mes concreto.</li>
+              <li><strong>Segmentador inferior.</strong> Usa <code>Calendario[AñoMes]</code>. Al seleccionar un mes, cambia el periodo analizado en el mapa. Esto funciona porque Calendario se relaciona de uno a muchos con la tabla de ventas mediante la fecha.</li>
+            </ul>
+            <details>
+              <summary>Medidas DAX del mapa</summary>
+              <div class="dax-content">
+                <pre><code>Ventas realizadas =
+CALCULATE(
+   SUM(sales_clean[sales]),
+   KEEPFILTERS(sales_clean[status] = "Shipped")
+)
+
+Ventas YTD =
+TOTALYTD(
+   [Ventas realizadas],
+   Calendario[Date]
+)
+
+Ventas MTD =
+TOTALMTD(
+   [Ventas realizadas],
+   Calendario[Date]
+)</code></pre>
+                <pre><code>Pedidos realizados =
+CALCULATE(
+   DISTINCTCOUNT(sales_clean[order_number]),
+   KEEPFILTERS(sales_clean[status] = "Shipped")
+)
+
+Ticket promedio =
+DIVIDE(
+   [Ventas realizadas],
+   [Pedidos realizados]
+)</code></pre>
+                <p><strong>Medidas DAX:</strong> <code>SUM</code> suma el importe de las líneas de venta y <code>DISTINCTCOUNT</code> cuenta cada pedido una sola vez, aunque tenga varios productos. <code>TOTALYTD</code> acumula desde el inicio del año hasta la última fecha del contexto; <code>TOTALMTD</code> hace lo mismo desde el inicio del mes. <code>DIVIDE</code> calcula el importe promedio por pedido y devuelve vacío si no hay pedidos para usar como denominador.</p>
+              </div>
+            </details>
+          </div>
+          <div class="general-insights" id="price-quantity-insights" hidden>
+            <h4>Cómo leer el gráfico</h4>
+            <ul>
+              <li><strong>Cada punto.</strong> Representa un producto identificado por <code>sales_clean[product_code]</code>.</li>
+              <li><strong>Eje X: precio unitario promedio.</strong> Muestra el promedio de <code>sales_clean[price_each]</code> por producto. Cada línea de pedido tiene el mismo peso en ese promedio.</li>
+              <li><strong>Eje Y: unidades vendidas.</strong> Muestra la medida <code>[Unidades vendidas]</code>: cuanto más alto está el punto, más unidades registra el producto en el contexto del filtro.</li>
+              <li><strong>Segmentador de estado.</strong> Usa <code>sales_clean[status]</code>. Para exponer el comportamiento de pedidos enviados se selecciona <code>Shipped</code>. En la captura las casillas están desmarcadas, por lo que sus cifras no se atribuyen exclusivamente a pedidos enviados.</li>
+              <li><strong>Observación visual.</strong> En la captura se concentran productos con precio promedio cercano a 90–100 y aparece un punto alrededor de 99 y 1.700 unidades. Es una observación del gráfico; por sí sola no demuestra que cambiar el precio cause un cambio en el volumen.</li>
+              <li><strong>Relación con descuentos.</strong> Este análisis usa el precio unitario registrado. Para medir descuentos se necesita un descuento explícito o un precio de referencia validado. <code>MSRP</code> es un precio sugerido: una diferencia frente a él solo puede informarse como brecha respecto al precio sugerido, no como descuento aplicado.</li>
+            </ul>
+            <details>
+              <summary>Cálculos en Power BI</summary>
+              <div class="dax-content">
+                <pre><code>Precio unitario promedio =
+AVERAGE(sales_clean[price_each])
+
+Unidades por estado seleccionado =
+SUM(sales_clean[quantity_ordered])</code></pre>
+                <p>Estas son fórmulas DAX de referencia para reproducir los cálculos, previa verificación de los nombres de columna. <code>AVERAGE</code> calcula el promedio simple de los precios registrados en las líneas de cada producto y <code>SUM</code> agrega sus cantidades en el contexto del filtro. Con <code>Shipped</code> seleccionado, la segunda medida suma solo las unidades de pedidos enviados. Si la medida original <code>[Unidades vendidas]</code> ya filtra <code>Shipped</code> internamente, se debe conservar esa lógica.</p>
+              </div>
+            </details>
+          </div>
+          <div class="general-insights" id="year-comparison-insights" hidden>
+            <h4>Comparación de enero a mayo</h4>
+            <p class="dax-content">Esta página responde al requerimiento 4: compara los mismos cinco meses de cada año. La altura de cada barra representa el importe acumulado de pedidos <code>Shipped</code> entre enero y mayo; la tabla muestra el importe exacto, la variación frente al año anterior y su estado.</p>
+            <table class="comparison-table">
+              <thead><tr><th>Año</th><th>Ventas enero–mayo</th><th>Crecimiento</th><th>Estado</th></tr></thead>
+              <tbody>
+                <tr><td>2003</td><td>839.377,35</td><td>—</td><td>Sin comparación</td></tr>
+                <tr><td>2004</td><td>1.267.959,53</td><td>51,06 %</td><td>Crecimiento</td></tr>
+                <tr><td>2005</td><td>1.323.735,83</td><td>4,40 %</td><td>Crecimiento</td></tr>
+              </tbody>
+            </table>
+            <ul>
+              <li><strong>Primer año.</strong> 2003 es el primer año disponible, por eso no existe un período anterior equivalente y su porcentaje queda en blanco.</li>
+              <li><strong>Total.</strong> 3.431.072,71 suma los tres períodos enero–mayo. El porcentaje se calcula con la base de comparación de cada año, por lo que la fila total se deja en blanco.</li>
+              <li><strong>Lectura.</strong> 2005 tiene el importe más alto, aunque su crecimiento frente a 2004 es menor que el crecimiento que tuvo 2004 frente a 2003.</li>
+            </ul>
+            <details>
+              <summary>Medidas DAX</summary>
+              <div class="dax-content">
+                <pre><code>Ventas enero a mayo =
+CALCULATE(
+   [Ventas realizadas],
+   KEEPFILTERS(Calendario[MesNumero] &gt;= 1),
+   KEEPFILTERS(Calendario[MesNumero] &lt;= 5)
+)</code></pre>
+                <pre><code>Crecimiento enero a mayo % =
+VAR AnioActual = SELECTEDVALUE(Calendario[Año])
+VAR VentasActuales = [Ventas enero a mayo]
+VAR VentasAnteriores =
+   IF(
+       NOT ISBLANK(AnioActual),
+       CALCULATE(
+           [Ventas enero a mayo],
+           REMOVEFILTERS(Calendario),
+           Calendario[Año] = AnioActual - 1
+       )
+   )
+RETURN
+   IF(
+       ISINSCOPE(Calendario[Año]) &amp;&amp;
+       NOT ISBLANK(VentasActuales) &amp;&amp;
+       NOT ISBLANK(VentasAnteriores),
+       DIVIDE(VentasActuales - VentasAnteriores, VentasAnteriores)
+   )</code></pre>
+                <pre><code>Estado crecimiento =
+VAR Variacion = [Crecimiento enero a mayo %]
+RETURN
+   SWITCH(
+       TRUE(),
+       ISBLANK(Variacion), "Sin comparación",
+       Variacion &gt; 0, "Crecimiento",
+       Variacion &lt; 0, "Disminución",
+       "Sin cambio"
+   )</code></pre>
+                <p><strong>Medidas DAX de referencia:</strong> la primera conserva el año de cada barra y limita el cálculo a los meses 1 a 5. La segunda cambia el contexto al año anterior, obtiene el importe del mismo período y calcula la variación sobre esa base; debe tener formato de porcentaje con dos decimales. La tercera traduce el resultado a una etiqueta para la tabla. Se deben verificar los nombres de columnas antes de aplicarlas en el modelo.</p>
+              </div>
+            </details>
+          </div>
+          <div class="page-tabs" role="tablist" aria-label="Seleccionar explicación de la página">
+            <button class="page-tab active" type="button" role="tab" aria-selected="true" data-page="0">1 · General</button>
+            <button class="page-tab" type="button" role="tab" aria-selected="false" data-page="1">2 · Productos</button>
+            <button class="page-tab" type="button" role="tab" aria-selected="false" data-page="2">3 · Clientes ABC</button>
+            <button class="page-tab" type="button" role="tab" aria-selected="false" data-page="3">4 · Mapa</button>
+            <button class="page-tab" type="button" role="tab" aria-selected="false" data-page="4">5 · Precio / cantidad</button>
+            <button class="page-tab" type="button" role="tab" aria-selected="false" data-page="5">6 · Comparación anual</button>
+            <button class="page-tab" type="button" role="tab" aria-selected="false" data-page="6">7 · Limitaciones</button>
+          </div>
+        </aside>
+      </div>
+      <p class="notice">Usa los botones de la derecha para navegar: cambian la página del informe y la explicación al mismo tiempo. Si cambias usando las pestañas internas de Power BI, el contenido derecho no puede actualizarse automáticamente porque el informe público está en un dominio externo.</p>
+    </section>
+
+    <section id="requerimientos" aria-labelledby="requerimientos-title">
+      <div class="section-head">
+        <div><span class="section-num">03 · REQUERIMIENTOS ANALÍTICOS</span><h2 id="requerimientos-title">Resumen de requerimientos analíticos</h2></div>
+        <p>Estos diez requerimientos orientan el análisis de ventas, clientes, productos, regiones y evolución temporal dentro del tablero.</p>
+      </div>
+      <div class="requirements">
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">01</span><h3>Total de ventas mensuales por país</h3></div><p>Mide el importe vendido cada mes y permite comparar el comportamiento entre países.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">02</span><h3>Rentabilidad por categoría de producto</h3></div><p>Compara el ingreso de cada categoría; la rentabilidad real requiere disponer de los costos.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">03</span><h3>Clientes con mayores ingresos generados</h3></div><p>Ordena los clientes según el importe de ventas que generan en el período seleccionado.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">04</span><h3>Comparativa año a año de ventas</h3></div><p>Contrasta las ventas de períodos equivalentes para identificar cambios entre años.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">05</span><h3>Tasa de crecimiento mensual</h3></div><p>Calcula la variación porcentual de las ventas frente al mes anterior.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">06</span><h3>Promedio de ventas por región</h3></div><p>Compara el valor promedio de las ventas entre las regiones comerciales.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">07</span><h3>Productos más vendidos por canal</h3></div><p>Busca identificar los productos con mayor venta según el canal comercial disponible.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">08</span><h3>Mapa geográfico de ventas</h3></div><p>Ubica las ventas por país para visualizar dónde se concentra el importe vendido.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">09</span><h3>Relación entre descuentos y volumen de compra</h3></div><p>Explora cómo se relacionan el precio o descuento aplicado y las unidades vendidas.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">10</span><h3>Análisis ABC de clientes (ventas acumuladas)</h3></div><p>Clasifica clientes según su aporte acumulado a las ventas totales.</p></article>
+      </div>
+    </section>
+
+    <section aria-labelledby="hallazgos">
+      <div class="section-head">
+        <div><span class="section-num">04 · RESULTADOS</span><h2 id="hallazgos">Resultados que se pueden defender</h2></div>
+        <p>Las métricas de ventas y el análisis estadístico usan únicamente registros con estado <strong>Shipped</strong>.</p>
+      </div>
+      <div class="results">
+        <div class="panel">
+          <h3>Alcance de ventas realizadas</h3>
+          <div class="metrics">
+            <div class="metric"><b>286</b><span>pedidos distintos</span></div>
+            <div class="metric"><b>91.403</b><span>unidades vendidas</span></div>
+            <div class="metric"><b>Classic Cars</b><span>categoría líder por importe</span></div>
+            <div class="metric"><b>EMEA</b><span>región líder en ventas totales</span></div>
+          </div>
+          <p class="notice">El archivo no confirma una moneda y no contiene costo, canal ni descuento explícito. Por eso se habla de importe vendido, no de rentabilidad, descuentos o causalidad.</p>
+        </div>
+        <aside class="panel anova">
+          <h3>ANOVA por región</h3>
+          <div class="pvalue">p = 0,6936</div>
+          <p>ANOVA clásico sobre el promedio de importe por pedido de cada cliente. Welch obtuvo p = 0,7021.</p>
+          <p><strong>Conclusión:</strong> con α = 0,05 no hay evidencia suficiente de diferencias regionales en ese promedio. Los grupos pequeños invitan a interpretar con cautela.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section id="anova-region" aria-labelledby="anova-title">
+      <div class="section-head">
+        <div><span class="section-num">05 · ANÁLISIS ESTADÍSTICO</span><h2 id="anova-title">ANOVA de ventas por región</h2></div>
+        <p>Complementa el requerimiento 6: evalúa si el importe promedio por pedido de los clientes difiere entre APAC, EMEA, Japan y NA.</p>
+      </div>
+      <div class="anova-layout">
+        <article class="anova-summary">
+          <h3>Pregunta y preparación de los datos</h3>
+          <p>La pregunta es si las medias poblacionales del importe promedio por pedido son iguales en las cuatro regiones.</p>
+          <p><strong>Hipótesis nula (H₀):</strong> el importe promedio por pedido de los clientes es igual en APAC, EMEA, Japan y NA.</p>
+          <p><strong>Hipótesis alternativa (H₁):</strong> al menos una región tiene un importe promedio por pedido de los clientes diferente.</p>
+          <p><strong>Regla de decisión:</strong> con α = 0,05, si p &lt; 0,05 se rechaza H₀ y se aplica Tukey HSD para ubicar los pares de regiones que difieren. Si p ≥ 0,05, no se rechaza H₀.</p>
+          <p><strong>Explicado de forma simple:</strong> primero calculamos cuánto vende, en promedio, cada cliente por pedido. Después comparamos esos promedios entre regiones. El valor p indica si las diferencias observadas son lo bastante grandes para considerarlas una diferencia real y no una variación normal de los datos. Un p menor que 0,05 indica evidencia de diferencia; un p mayor o igual a 0,05 indica que no hay evidencia suficiente.</p>
+          <ol class="anova-steps">
+            <li>Se usó el CSV limpio y se filtraron las filas con <code>status = 'Shipped'</code>.</li>
+            <li>Se sumó <code>sales</code> por <code>order_number</code>, obteniendo 286 pedidos enviados. Se validó que cada pedido tuviera un único cliente y una única región.</li>
+            <li>Para cada cliente se calculó el promedio de sus importes totales por pedido. Así se obtuvieron 92 valores, uno por cliente, evitando tratar varios pedidos del mismo cliente como observaciones independientes.</li>
+          </ol>
+        </article>
+        <aside class="anova-result">
+          <h3>Conclusión</h3>
+          <p><strong>Como p = 0,6936 es mayor que α = 0,05, no se rechaza H₀: no hay evidencia suficiente para afirmar que el importe promedio por pedido de los clientes difiera entre regiones.</strong></p>
+          <p>En otras palabras: aunque los promedios de las regiones no son exactamente iguales, la diferencia encontrada puede deberse al comportamiento normal de esta muestra de clientes. Por eso no afirmamos que una región venda más que otra en promedio.</p>
+          <div class="anova-sample">
+            <div><b>6</b><span>clientes APAC</span></div>
+            <div><b>44</b><span>clientes EMEA</span></div>
+            <div><b>4</b><span>clientes Japan</span></div>
+            <div><b>38</b><span>clientes NA</span></div>
+          </div>
+          <p>Welch no exige varianzas iguales y llegó a la misma conclusión. Persisten incertidumbres, especialmente por los grupos pequeños de Japan y APAC.</p>
+          <p>Tukey HSD no se aplica en este resultado porque el ANOVA global no rechazó H₀.</p>
+        </aside>
+      </div>
+      <div class="anova-table-wrap">
+        <h3>Resultados de las pruebas</h3>
+        <p>ANOVA compara las diferencias entre medias regionales con la variación entre clientes de una misma región. La hipótesis nula plantea cuatro medias iguales; la alternativa, que al menos una difiere.</p>
+        <table class="anova-table">
+          <thead><tr><th>Prueba</th><th>F</th><th>Grados de libertad</th><th>Valor p</th></tr></thead>
+          <tbody>
+            <tr><td>ANOVA clásico</td><td>0,4849</td><td>(3, 88)</td><td>0,6936</td></tr>
+            <tr><td>ANOVA de Welch</td><td>0,4773</td><td>(3, 17,8531)</td><td>0,7021</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Eta cuadrado = 0,0163.</strong> En esta muestra, aproximadamente el 1,63 % de la variabilidad observada en los promedios por cliente se asocia con las diferencias entre regiones.</p>
+      </div>
+      <div class="anova-visuals" aria-label="Visualizaciones del análisis ANOVA">
+        <figure class="anova-figure">
+          <img src="../data/analysis/anova/histograms_by_region.png" alt="Histogramas del promedio de ventas por pedido para APAC, EMEA, Japan y NA.">
+          <figcaption><strong>1. Histogramas por región</strong>Se tomó el promedio de ventas por pedido de cada cliente y se contó cuántos clientes quedaron en cada rango de valores. Sirven para observar la forma de los datos antes del ANOVA. EMEA y NA tienen más clientes; APAC y Japan tienen pocos casos, por eso sus gráficos deben leerse con cautela.</figcaption>
+        </figure>
+        <figure class="anova-figure">
+          <img src="../data/analysis/anova/qq_plots_by_region.png" alt="Gráficos Q-Q del promedio de ventas por pedido para cada región.">
+          <figcaption><strong>2. Gráficos Q–Q: revisión de normalidad</strong>Cada punto representa un cliente. Cuando los puntos siguen aproximadamente la línea roja, los datos se comportan de manera cercana a una distribución normal. En conjunto, esto coincide con las pruebas de normalidad: sus p-valores fueron mayores que 0,05.</figcaption>
+        </figure>
+        <figure class="anova-figure wide">
+          <img src="../data/analysis/anova/boxplot_by_region.png" alt="Diagrama de caja que compara el promedio de ventas por pedido entre regiones.">
+          <figcaption><strong>3. Diagrama de caja: comparación directa</strong>La línea naranja es el valor central de cada región; la caja muestra dónde está la mitad de los clientes y las líneas negras muestran el rango. Las cajas se superponen bastante y NA tiene un valor bajo aislado. Visualmente no aparece una separación clara entre regiones, lo cual coincide con el ANOVA: p = 0,6936, sin evidencia suficiente de una diferencia promedio.</figcaption>
+        </figure>
+      </div>
+      <details class="anova-details">
+        <summary>Metodología y código Python</summary>
+        <div class="dax-content">
+          <p><strong>Código Python funcional del análisis:</strong> basado en <code>analisis_anova.py</code> del proyecto.</p>
+          <pre><code>import csv
+from collections import defaultdict
+from pathlib import Path
+from scipy import stats
+
+SOURCE = Path("data/clean/sales_clean.csv")
+ALPHA = 0.05
+H0 = "El importe promedio por pedido es igual en todas las regiones."
+H1 = "Al menos una región tiene un importe promedio por pedido diferente."
+
+def welch_anova(groups):
+    names = list(groups)
+    n = {name: len(groups[name]) for name in names}
+    mean = {name: sum(groups[name]) / n[name] for name in names}
+    variance = {
+        name: sum((value - mean[name]) ** 2 for value in groups[name]) / (n[name] - 1)
+        for name in names
+    }
+    k = len(names)
+    weights = {name: n[name] / variance[name] for name in names}
+    weight_sum = sum(weights.values())
+    weighted_mean = sum(weights[name] * mean[name] for name in names) / weight_sum
+    a = sum(weights[name] * (mean[name] - weighted_mean) ** 2 for name in names) / (k - 1)
+    b = sum((1 / (n[name] - 1)) * (1 - weights[name] / weight_sum) ** 2 for name in names)
+    statistic = a / (1 + (2 * (k - 2) / (k**2 - 1)) * b)
+    df1 = k - 1
+    df2 = (k**2 - 1) / (3 * b)
+    return statistic, df1, df2, stats.f.sf(statistic, df1, df2)
+
+with SOURCE.open(encoding="utf-8", newline="") as file:
+    shipped_rows = [row for row in csv.DictReader(file) if row["status"] == "Shipped"]
+
+orders = {}
+for row in shipped_rows:
+    order = orders.setdefault(row["order_number"], {"sales": 0.0, "territories": set(), "customers": set()})
+    order["sales"] += float(row["sales"])
+    order["territories"].add(row["territory"])
+    order["customers"].add(row["customer_name"])
+
+if any(len(o["territories"]) != 1 or len(o["customers"]) != 1 for o in orders.values()):
+    raise ValueError("Hay pedidos sin región o cliente único.")
+
+clients = defaultdict(lambda: {"territories": set(), "order_sales": []})
+for order in orders.values():
+    customer = next(iter(order["customers"]))
+    clients[customer]["territories"].update(order["territories"])
+    clients[customer]["order_sales"].append(order["sales"])
+
+if any(len(client["territories"]) != 1 for client in clients.values()):
+    raise ValueError("Hay clientes con región no única.")
+
+groups = defaultdict(list)
+for customer, client in clients.items():
+    territory = next(iter(client["territories"]))
+    average = sum(client["order_sales"]) / len(client["order_sales"])
+    groups[territory].append(average)
+
+classic_f, classic_p = stats.f_oneway(*groups.values())
+welch_f, welch_df1, welch_df2, welch_p = welch_anova(groups)
+
+# Solo se comparan pares de regiones si el ANOVA global rechaza H0.
+if classic_p &lt; ALPHA:
+    tukey = stats.tukey_hsd(*groups.values())
+    print("Se rechaza H0: revisar los p-valores ajustados de Tukey HSD.")
+    print(tukey.pvalue)
+else:
+    print("No se rechaza H0: Tukey HSD no es necesario.")
+
+values = [value for group in groups.values() for value in group]
+grand_mean = sum(values) / len(values)
+ss_between = sum(len(group) * (sum(group) / len(group) - grand_mean) ** 2
+                 for group in groups.values())
+eta_squared = ss_between / sum((value - grand_mean) ** 2 for value in values)
+
+print(f"H0: {H0}")
+print(f"H1: {H1}")
+print(f"ANOVA clásico: F={classic_f:.4f}, p={classic_p:.4f}, eta²={eta_squared:.4f}")
+print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
+          <p><strong>Explicación breve:</strong> el código filtra pedidos enviados, suma cada pedido, calcula un promedio por cliente y agrupa esos promedios por región. Finalmente ejecuta ANOVA clásico, Welch y eta cuadrado. La comparación Tukey HSD solo se activa si el ANOVA detecta una diferencia global (<code>p &lt; 0,05</code>); en los datos actuales no se activa porque <code>p = 0,6936</code>.</p>
+        </div>
+      </details>
+    </section>
+
+  </main>
+  <footer><div class="wrap">Proyecto académico de análisis de ventas · Michael David Lagos Rosero · Universidad Cooperativa de Colombia, Campus Pasto</div></footer>
+  <script>
+    const pages = [
+      { pageName: 'ReportSection', title: 'Ventas mensuales por país', description: 'Esta página responde principalmente cuánto se vendió cada mes por país. También apoya el ranking de clientes, el crecimiento mensual y la comparación con el mismo mes del año anterior.', points: ['Requerimiento 1: ventas mensuales por país.', 'Apoya los requerimientos 3, 4 y 5.', 'La comparación enero–mayo entre años está en la página 6.'] },
+      { pageName: 'ReportSection1', title: 'Rentabilidad por categoría de producto', description: 'Esta página compara los ingresos generados por cada categoría de producto. No calcula rentabilidad porque el archivo no contiene costos.', points: ['Visual: Ventas realizadas por product_line.', 'Cada barra suma el importe vendido de pedidos Shipped.', 'Classic Cars lidera sin filtro territorial.'] },
+      { pageName: 'ReportSection2', title: 'Clientes con mayores ingresos y análisis ABC', description: 'La tabla ordena a los clientes por importe vendido y muestra cómo se acumula su participación en las ventas. Cubre los requerimientos 3 y 10.', points: ['Ranking de clientes por ventas realizadas.', 'Acumulado y porcentaje sobre el total seleccionado.', 'Clasificación A, B y C con cortes de 80 % y 95 %.'] },
+      { pageName: 'ReportSection3', title: 'Mapa geográfico de ventas', description: 'El mapa ubica las ventas por país y permite explorar cómo cambian al elegir un mes en el segmentador.', points: ['Cada burbuja representa un country.', 'El tamaño representa ventas realizadas.', 'El recuadro muestra ventas, acumulados, pedidos y ticket.'] },
+      { pageName: 'ReportSection4', title: 'Precio unitario promedio y unidades vendidas por producto', description: 'Cada punto representa un producto y permite explorar, sin inferir causalidad, la relación descriptiva entre precio y volumen.', points: ['Eje X: promedio de price_each.', 'Eje Y: unidades vendidas.', 'El filtro status permite concentrarse en Shipped.'] },
+      { pageName: 'ReportSection5', title: 'Comparación interanual de ventas de enero a mayo', description: 'Esta página compara los mismos cinco meses de cada año para responder al requerimiento 4, sin mezclar años completos con períodos incompletos.', points: ['Ventas acumuladas de enero a mayo por año.', 'Variación frente al mismo período del año anterior.', 'Estado de crecimiento para cada año comparable.'] },
+      { pageName: 'ReportSection6', title: 'Limitaciones del análisis', description: 'La última página delimita claramente qué se puede interpretar a partir de este conjunto de datos.', points: ['La moneda no está confirmada en el archivo.', 'No hay costo, canal de venta ni descuento explícito.', 'No se infiere rentabilidad, descuentos ni causalidad.'], say: '"Estos resultados describen el importe vendido. Sin costos ni descuentos no sería responsable afirmar rentabilidad."' }
+    ];
+    const title = document.getElementById('guide-title');
+    const description = document.getElementById('guide-description');
+    const points = document.getElementById('guide-points');
+    const generalInsights = document.getElementById('general-insights');
+    const productsInsights = document.getElementById('products-insights');
+    const abcInsights = document.getElementById('abc-insights');
+    const mapInsights = document.getElementById('map-insights');
+    const priceQuantityInsights = document.getElementById('price-quantity-insights');
+    const yearComparisonInsights = document.getElementById('year-comparison-insights');
+    const number = document.getElementById('guide-number');
+    const tabs = document.querySelectorAll('.page-tab');
+    const report = document.getElementById('powerbi-report');
+    const reportUrl = 'https://app.powerbi.com/view?r=eyJrIjoiN2ZkM2NhNDItOTI5MC00MGViLWE0MmYtMzY4MTYyZTA5NGY2IiwidCI6IjhkMzY4MzZlLTZiNzUtNGRlNi1iYWI5LTVmNGIxNzc1NDI3ZiIsImMiOjR9';
+    function showPage(index) {
+      const page = pages[index];
+      number.textContent = `Página ${index + 1} de 7`;
+      title.textContent = page.title;
+      description.textContent = page.description;
+      points.replaceChildren(...page.points.map(point => { const item = document.createElement('li'); item.textContent = point; return item; }));
+      generalInsights.hidden = index !== 0;
+      productsInsights.hidden = index !== 1;
+      abcInsights.hidden = index !== 2;
+      mapInsights.hidden = index !== 3;
+      priceQuantityInsights.hidden = index !== 4;
+      yearComparisonInsights.hidden = index !== 5;
+      tabs.forEach((tab, tabIndex) => { const selected = tabIndex === index; tab.classList.toggle('active', selected); tab.setAttribute('aria-selected', selected); });
+      report.src = `${reportUrl}&pageName=${page.pageName}`;
+    }
+    tabs.forEach(tab => tab.addEventListener('click', () => showPage(Number(tab.dataset.page))));
+  </script>
+</body>
+</html>
