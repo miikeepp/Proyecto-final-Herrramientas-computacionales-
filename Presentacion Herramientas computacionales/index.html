@@ -212,45 +212,37 @@
         <p>Antes de construir el tablero, los datos de ventas se extrajeron, transformaron y validaron con PySpark.</p>
       </div>
       <div class="steps">
-        <article class="step"><h3>Extracción</h3><p>Se leyó <code>sales_data_sample.csv</code> sin modificar el archivo original, usando codificación ISO-8859-1. Se conservaron todas las filas y estados de pedido durante la limpieza.</p></article>
-        <article class="step"><h3>Limpieza</h3><p>Se quitaron espacios externos y las cadenas vacías se convirtieron en nulos. Las conversiones de números y fechas se hicieron con <code>try_cast</code>; los valores inválidos quedaron marcados para revisión.</p></article>
-        <article class="step"><h3>Transformación</h3><p>Se asignaron tipos a ventas, cantidades y precios; además se derivaron fecha, año, mes y trimestre. La bandera <code>es_venta_realizada</code> identifica las filas con estado <code>Shipped</code>.</p></article>
-        <article class="step"><h3>Validación</h3><p>Solo se eliminaron duplicados exactos. Las claves repetidas con contenido diferente se conservaron y se reportaron para no perder información. <code>SALES</code> se mantuvo como el importe oficial.</p></article>
-        <article class="step"><h3>Carga</h3><p>La capa limpia se generó en <code>sales_clean.csv</code> para Power BI y en JSONL. También se creó un resumen de validación con conteos, nulos y controles de calidad.</p></article>
-        <article class="step"><h3>Regla de análisis</h3><p>Las métricas principales filtran pedidos <code>Shipped</code>. No se infieren costos, descuentos ni canales: el dataset no contiene esos campos de forma explícita.</p></article>
+        <article class="step"><h3>Extracción</h3><p>Se leyó <code>sales_data_sample.csv</code> sin modificar el archivo original, con su codificación real (IBM437), para que las tildes se lean bien: <em>Martín</em>, <em>Cataluña</em>, <em>Berguvsvägen</em>. Se conservaron todas las filas y estados de pedido.</p></article>
+        <article class="step"><h3>Limpieza</h3><p>Se quitaron espacios sobrantes y los textos vacíos pasaron a nulos. Se recalculó <code>PRICEEACH</code> en las 1.304 filas donde venía truncado en 100 (<code>SALES / QUANTITYORDERED</code>) y se corrigieron ciudades mal escritas (<em>Gensve</em>, <em>Koln</em>, <em>NYC</em>…).</p></article>
+        <article class="step"><h3>Transformación</h3><p>Los tipos se asignaron con <code>TRY_CAST</code> en Spark SQL, marcando cada fallo. Se derivaron fecha, año, mes y trimestre, la bandera <code>es_venta_realizada</code> (<code>Shipped</code>) y las métricas <code>discount_pct</code>, <code>estimated_cost</code>, <code>profit</code> y <code>margin_pct</code>.</p></article>
+        <article class="step"><h3>Validación</h3><p>El script se detiene si hay líneas de pedido repetidas, valores que no se pudieron convertir o si <code>SALES</code> no cuadra con cantidad × precio. El resumen queda en <code>validation_summary.json</code>.</p></article>
+        <article class="step"><h3>Carga</h3><p>La capa limpia se cargó en tres formatos: <code>sales_clean.csv</code> (fuente de Power BI), <code>sales_clean.json</code> y la base SQLite <code>sales_clean.db</code> (tabla <code>ventas</code>).</p></article>
+        <article class="step"><h3>Regla de análisis</h3><p>Las métricas filtran pedidos <code>Shipped</code>. El dataset no trae costo ni canal: la ganancia supone un costo del 60 % del MSRP y <code>deal_size</code> se usa como aproximación de canal. Ambos supuestos se declaran en el informe.</p></article>
       </div>
       <details class="anova-details" aria-label="Código del proceso ETL">
         <summary>Metodología y código ETL (Python, Spark SQL y Power Query)</summary>
         <div class="dax-content">
           <p><strong>Python y PySpark:</strong> <code>etl_pyspark.py</code> lee el origen, normaliza los valores vacíos y ejecuta las reglas definidas en Spark SQL.</p>
-          <pre><code>from pathlib import Path
-from pyspark.sql import SparkSession, functions as F, types as T
+          <pre><code>crudo = (spark.read.option("header", True)
+    .option("encoding", "IBM437").csv(str(ORIGEN)))
+crudo = crudo.select([F.expr(f"NULLIF(REGEXP_REPLACE(TRIM({c}), ' +', ' '), '')").alias(c)
+                      for c in crudo.columns])
 
-ROOT = Path(__file__).resolve().parent
-SOURCE = ROOT / "sales_data_sample.csv"
-SQL_TRANSFORM = ROOT / "transformaciones_etl.sql"
+crudo.createOrReplaceTempView("ventas_normalizadas")
+df = spark.sql(SQL_TIPOS.read_text(encoding="utf-8")).dropDuplicates()
 
-spark = (SparkSession.builder.master("local[1]")
-    .appName("sales-cleaning").config("spark.ui.enabled", "false")
-    .getOrCreate())
+# PRICEEACH viene truncado en 100: se recalcula desde SALES
+precio_mal = F.abs(F.col("sales") - F.col("quantity_ordered") * F.col("price_each")) &gt; 0.01
+df = df.withColumn("price_each", F.when(precio_mal,
+        F.round(F.col("sales") / F.col("quantity_ordered"), 2)).otherwise(F.col("price_each")))
 
-raw_schema = T.StructType([
-    T.StructField(name, T.StringType(), True) for name in SOURCE_COLUMNS
-])
-raw = (spark.read.option("header", True).option("encoding", "ISO-8859-1")
-    .option("mode", "PERMISSIVE").schema(raw_schema).csv(str(SOURCE)))
-
-normalized = raw.select(*[nonblank(name).alias(name) for name in SOURCE_COLUMNS])
-normalized.createOrReplaceTempView("ventas_normalizadas")
-typed = spark.sql(SQL_TRANSFORM.read_text(encoding="utf-8"))
-
-clean = (typed
-    .withColumn("has_quality_error", F.expr("invalid_order_number OR invalid_order_line_number OR invalid_quantity OR invalid_price_each OR invalid_sales OR invalid_order_date OR invalid_msrp"))
-    .withColumn("es_venta_realizada", F.col("status") == F.lit("Shipped"))
+df = (df.replace(CIUDADES, subset=["city"])
+    .withColumn("es_venta_realizada", F.col("status") == "Shipped")
     .withColumn("order_date", F.to_date("order_timestamp"))
-    .withColumn("year", F.year("order_timestamp"))
-    .withColumn("month", F.month("order_timestamp"))
-    .withColumn("quarter", F.quarter("order_timestamp")))</code></pre>
+    .withColumn("discount_pct", F.round((F.col("msrp") - F.col("price_each")) / F.col("msrp"), 4))
+    .withColumn("estimated_cost", F.round(F.col("msrp") * PORC_COSTO * F.col("quantity_ordered"), 2))
+    .withColumn("profit", F.round(F.col("sales") - F.col("estimated_cost"), 2))
+    .withColumn("margin_pct", F.round(F.col("profit") / F.col("sales"), 4)))</code></pre>
           <p><strong>Spark SQL:</strong> <code>transformaciones_etl.sql</code> convierte los datos y marca cada conversión inválida para auditoría.</p>
           <pre><code>SELECT
     TRY_CAST(ORDERNUMBER AS INT) AS order_number,
@@ -266,22 +258,20 @@ clean = (typed
     ORDERDATE IS NOT NULL AND
         TRY_TO_TIMESTAMP(ORDERDATE, 'M/d/yyyy H:mm') IS NULL AS invalid_order_date
 FROM ventas_normalizadas;</code></pre>
-          <p><strong>Power Query:</strong> tras ejecutar el ETL, Power BI carga <code>sales_clean.csv</code>, asigna tipos y filtra las ventas realizadas.</p>
+          <p><strong>Power Query:</strong> tras ejecutar el ETL, Power BI carga <code>sales_clean.csv</code> y asigna tipos. <code>QuoteStyle.Csv</code> evita que nombres con coma (<em>AV Stores, Co.</em>) se partan en dos columnas, y <code>"en-US"</code> lee bien el punto decimal.</p>
           <pre><code>let
-    RutaArchivo = "C:\\RUTA_DEL_PROYECTO\\data\\clean\\sales_clean.csv",
-    Fuente = Csv.Document(File.Contents(RutaArchivo),
+    RutaProyecto = "C:\\RUTA_DEL_PROYECTO\\",
+    Origen = Csv.Document(File.Contents(RutaProyecto &amp; "data\\clean\\sales_clean.csv"),
         [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
-    Encabezados = Table.PromoteHeaders(Fuente, [PromoteAllScalars = true]),
+    Encabezados = Table.PromoteHeaders(Origen, [PromoteAllScalars = true]),
     Tipos = Table.TransformColumnTypes(Encabezados, {
-        {"sales", Currency.Type}, {"order_date", type date},
-        {"year", Int64.Type}, {"month", Int64.Type},
+        {"sales", type number}, {"order_date", type date},
+        {"profit", type number}, {"discount_pct", type number},
         {"es_venta_realizada", type logical}
-    }),
-    VentasRealizadas = Table.SelectRows(Tipos,
-        each [es_venta_realizada] = true)
+    }, "en-US")
 in
-    VentasRealizadas</code></pre>
-          <p><strong>Resultado:</strong> se conserva la capa limpia completa, se reportan problemas de calidad y Power BI calcula métricas solamente con pedidos enviados.</p>
+    Tipos</code></pre>
+          <p><strong>Resultado:</strong> se conserva la capa limpia completa y las medidas DAX calculan con pedidos enviados (<code>Shipped</code>).</p>
         </div>
       </details>
     </section>
@@ -378,7 +368,7 @@ SUMMARIZECOLUMNS(
    "Importe vendido", [Ventas realizadas]
 )
 ORDER BY [Importe vendido] DESC</code></pre>
-                <p>Esta consulta se puede ejecutar en la Vista de consultas DAX, siempre que exista la medida <code>[Ventas realizadas]</code>. Devuelve una tabla con una fila por categoría, ordenada de mayor a menor importe vendido, para comprobar los resultados en Power BI. El HTML solo muestra el código como referencia: no inventa una columna de costos ni usa <code>MSRP</code> como costo.</p>
+                <p>Esta consulta se puede ejecutar en la Vista de consultas DAX, siempre que exista la medida <code>[Ventas realizadas]</code>. Devuelve una tabla con una fila por categoría, ordenada de mayor a menor importe vendido, para comprobar los resultados en Power BI. Para la rentabilidad se usa la medida <code>[Ganancia estimada]</code> = suma de <code>profit</code> en pedidos <code>Shipped</code>, con un costo supuesto del 60 % del MSRP. Con ese supuesto, Classic Cars es la que más gana (1,38 millones), pero tiene el margen más bajo (37 %); Trains tiene el más alto (48 %).</p>
               </div>
             </details>
           </div>
@@ -513,7 +503,7 @@ DIVIDE(
               <li><strong>Eje Y: unidades vendidas.</strong> Muestra la medida <code>[Unidades vendidas]</code>: cuanto más alto está el punto, más unidades registra el producto en el contexto del filtro.</li>
               <li><strong>Segmentador de estado.</strong> Usa <code>sales_clean[status]</code>. Para exponer el comportamiento de pedidos enviados se selecciona <code>Shipped</code>. En la captura las casillas están desmarcadas, por lo que sus cifras no se atribuyen exclusivamente a pedidos enviados.</li>
               <li><strong>Observación visual.</strong> En la captura se concentran productos con precio promedio cercano a 90–100 y aparece un punto alrededor de 99 y 1.700 unidades. Es una observación del gráfico; por sí sola no demuestra que cambiar el precio cause un cambio en el volumen.</li>
-              <li><strong>Relación con descuentos.</strong> Este análisis usa el precio unitario registrado. Para medir descuentos se necesita un descuento explícito o un precio de referencia validado. <code>MSRP</code> es un precio sugerido: una diferencia frente a él solo puede informarse como brecha respecto al precio sugerido, no como descuento aplicado.</li>
+              <li><strong>Relación con descuentos.</strong> El descuento se mide frente al precio de lista: <code>discount_pct = (MSRP − precio) / MSRP</code>. Un valor negativo indica venta por encima del precio de lista. Las unidades por línea de pedido se mantienen en unas 35 en todos los rangos de descuento (Spearman = 0,03): el descuento no se asocia con un mayor volumen.</li>
             </ul>
             <details>
               <summary>Cálculos en Power BI</summary>
@@ -606,14 +596,14 @@ RETURN
       </div>
       <div class="requirements">
         <article class="requirement"><div class="requirement-top"><span class="requirement-num">01</span><h3>Total de ventas mensuales por país</h3></div><p>Mide el importe vendido cada mes y permite comparar el comportamiento entre países.</p></article>
-        <article class="requirement"><div class="requirement-top"><span class="requirement-num">02</span><h3>Rentabilidad por categoría de producto</h3></div><p>Compara el ingreso de cada categoría; la rentabilidad real requiere disponer de los costos.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">02</span><h3>Rentabilidad por categoría de producto</h3></div><p>Ganancia y margen estimados por categoría, con un costo supuesto del 60 % del precio de lista (el dataset no trae costos).</p></article>
         <article class="requirement"><div class="requirement-top"><span class="requirement-num">03</span><h3>Clientes con mayores ingresos generados</h3></div><p>Ordena los clientes según el importe de ventas que generan en el período seleccionado.</p></article>
         <article class="requirement"><div class="requirement-top"><span class="requirement-num">04</span><h3>Comparativa año a año de ventas</h3></div><p>Contrasta las ventas de períodos equivalentes para identificar cambios entre años.</p></article>
         <article class="requirement"><div class="requirement-top"><span class="requirement-num">05</span><h3>Tasa de crecimiento mensual</h3></div><p>Calcula la variación porcentual de las ventas frente al mes anterior.</p></article>
         <article class="requirement"><div class="requirement-top"><span class="requirement-num">06</span><h3>Promedio de ventas por región</h3></div><p>Compara el valor promedio de las ventas entre las regiones comerciales.</p></article>
-        <article class="requirement"><div class="requirement-top"><span class="requirement-num">07</span><h3>Productos más vendidos por canal</h3></div><p>Busca identificar los productos con mayor venta según el canal comercial disponible.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">07</span><h3>Productos más vendidos por canal</h3></div><p>Unidades vendidas por producto según <code>deal_size</code> (Small, Medium, Large), usado como aproximación de canal.</p></article>
         <article class="requirement"><div class="requirement-top"><span class="requirement-num">08</span><h3>Mapa geográfico de ventas</h3></div><p>Ubica las ventas por país para visualizar dónde se concentra el importe vendido.</p></article>
-        <article class="requirement"><div class="requirement-top"><span class="requirement-num">09</span><h3>Relación entre descuentos y volumen de compra</h3></div><p>Explora cómo se relacionan el precio o descuento aplicado y las unidades vendidas.</p></article>
+        <article class="requirement"><div class="requirement-top"><span class="requirement-num">09</span><h3>Relación entre descuentos y volumen de compra</h3></div><p>Compara las unidades por línea de pedido entre rangos de descuento frente al precio de lista.</p></article>
         <article class="requirement"><div class="requirement-top"><span class="requirement-num">10</span><h3>Análisis ABC de clientes (ventas acumuladas)</h3></div><p>Clasifica clientes según su aporte acumulado a las ventas totales.</p></article>
       </div>
     </section>
@@ -632,7 +622,7 @@ RETURN
             <div class="metric"><b>Classic Cars</b><span>categoría líder por importe</span></div>
             <div class="metric"><b>EMEA</b><span>región líder en ventas totales</span></div>
           </div>
-          <p class="notice">El archivo no confirma una moneda y no contiene costo, canal ni descuento explícito. Por eso se habla de importe vendido, no de rentabilidad, descuentos o causalidad.</p>
+          <p class="notice">Margen estimado total: 40 % (costo supuesto del 60 % del MSRP). Classic Cars gana más en valor, pero Trains tiene el mejor margen. El descuento no se asocia con más unidades por pedido. La moneda no está documentada en el dataset.</p>
         </div>
         <aside class="panel anova">
           <h3>ANOVA por región</h3>
@@ -794,12 +784,12 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
   <script>
     const pages = [
       { pageName: 'ReportSection', title: 'Ventas mensuales por país', description: 'Esta página responde principalmente cuánto se vendió cada mes por país. También apoya el ranking de clientes, el crecimiento mensual y la comparación con el mismo mes del año anterior.', points: ['Requerimiento 1: ventas mensuales por país.', 'Apoya los requerimientos 3, 4 y 5.', 'La comparación enero–mayo entre años está en la página 6.'] },
-      { pageName: 'ReportSection1', title: 'Rentabilidad por categoría de producto', description: 'Esta página compara los ingresos generados por cada categoría de producto. No calcula rentabilidad porque el archivo no contiene costos.', points: ['Visual: Ventas realizadas por product_line.', 'Cada barra suma el importe vendido de pedidos Shipped.', 'Classic Cars lidera sin filtro territorial.'] },
+      { pageName: 'ReportSection1', title: 'Rentabilidad por categoría de producto', description: 'Esta página compara los ingresos y la ganancia estimada de cada categoría de producto. La ganancia supone un costo del 60 % del precio de lista, porque el dataset no trae costos.', points: ['Visual: Ventas realizadas por product_line.', 'Cada barra suma el importe vendido de pedidos Shipped.', 'Classic Cars lidera sin filtro territorial.'] },
       { pageName: 'ReportSection2', title: 'Clientes con mayores ingresos y análisis ABC', description: 'La tabla ordena a los clientes por importe vendido y muestra cómo se acumula su participación en las ventas. Cubre los requerimientos 3 y 10.', points: ['Ranking de clientes por ventas realizadas.', 'Acumulado y porcentaje sobre el total seleccionado.', 'Clasificación A, B y C con cortes de 80 % y 95 %.'] },
       { pageName: 'ReportSection3', title: 'Mapa geográfico de ventas', description: 'El mapa ubica las ventas por país y permite explorar cómo cambian al elegir un mes en el segmentador.', points: ['Cada burbuja representa un country.', 'El tamaño representa ventas realizadas.', 'El recuadro muestra ventas, acumulados, pedidos y ticket.'] },
       { pageName: 'ReportSection4', title: 'Precio unitario promedio y unidades vendidas por producto', description: 'Cada punto representa un producto y permite explorar, sin inferir causalidad, la relación descriptiva entre precio y volumen.', points: ['Eje X: promedio de price_each.', 'Eje Y: unidades vendidas.', 'El filtro status permite concentrarse en Shipped.'] },
       { pageName: 'ReportSection5', title: 'Comparación interanual de ventas de enero a mayo', description: 'Esta página compara los mismos cinco meses de cada año para responder al requerimiento 4, sin mezclar años completos con períodos incompletos.', points: ['Ventas acumuladas de enero a mayo por año.', 'Variación frente al mismo período del año anterior.', 'Estado de crecimiento para cada año comparable.'] },
-      { pageName: 'ReportSection6', title: 'Limitaciones del análisis', description: 'La última página delimita claramente qué se puede interpretar a partir de este conjunto de datos.', points: ['La moneda no está confirmada en el archivo.', 'No hay costo, canal de venta ni descuento explícito.', 'No se infiere rentabilidad, descuentos ni causalidad.'], say: '"Estos resultados describen el importe vendido. Sin costos ni descuentos no sería responsable afirmar rentabilidad."' }
+      { pageName: 'ReportSection6', title: 'Limitaciones del análisis', description: 'La última página delimita claramente qué se puede interpretar a partir de este conjunto de datos.', points: ['La moneda no está confirmada en el archivo.', 'Costo supuesto: 60 % del MSRP; canal aproximado con deal_size.', 'Las relaciones observadas son descriptivas, no causales.'], say: '"La rentabilidad es una estimación con un supuesto de costo declarado; no reemplaza los costos reales de la empresa."' }
     ];
     const title = document.getElementById('guide-title');
     const description = document.getElementById('guide-description');
