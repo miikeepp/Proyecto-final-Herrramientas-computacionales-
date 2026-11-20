@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
   <style>
     :root {
       --ink:#0f2744; --muted:#5a7188; --navy:#081626; --navy2:#102a45;
@@ -181,31 +182,153 @@
       .dashboard iframe { height:480px; }
       .page-guide { height:auto; max-height:680px; }
     }
+
+    /* ============ Mejoras interactivas + 3D ============ */
+    /* Hero con escena 3D */
+    .hero-grid { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); align-items:center; gap:34px; }
+    .hero-copy { position:relative; z-index:2; }
+    .hero-3d { position:relative; z-index:2; min-height:420px; border-radius:22px; overflow:hidden;
+      background:radial-gradient(130% 120% at 70% 20%, rgba(14,165,160,.18), transparent 60%), rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.1); box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 24px 60px rgba(0,0,0,.3); cursor:grab; }
+    .hero-3d:active { cursor:grabbing; }
+    .hero-3d canvas { display:block; width:100%; height:100%; }
+    .hero-3d .hint { position:absolute; left:16px; bottom:14px; z-index:3; color:#bfe9ec; font-size:.82rem; font-weight:600;
+      display:inline-flex; align-items:center; gap:7px; background:rgba(8,22,38,.5); padding:7px 12px; border-radius:999px; backdrop-filter:blur(4px); pointer-events:none; }
+    .hero-3d .hint svg { width:15px; height:15px; }
+    .hero-stats { display:flex; flex-wrap:wrap; gap:26px; margin-top:30px; }
+    .hero-stat b { display:block; font-family:Sora,sans-serif; font-weight:800; font-size:2rem; letter-spacing:-.02em; color:#fff; line-height:1; }
+    .hero-stat span { display:block; margin-top:6px; color:#9fc4d6; font-size:.9rem; }
+
+    /* Showroom 3D */
+    .showroom-stage { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(300px,.9fr); gap:0; overflow:hidden;
+      border:1px solid var(--line); border-radius:22px; background:var(--card); box-shadow:0 18px 44px rgba(20,50,75,.12); }
+    .model-viewport { position:relative; min-height:560px; cursor:grab;
+      background:
+        radial-gradient(120% 90% at 50% 15%, #15405c 0%, #0c2740 45%, #081a2c 100%); }
+    .model-viewport:active { cursor:grabbing; }
+    .model-viewport canvas { display:block; width:100%; height:100%; }
+    .model-viewport .vp-badge { position:absolute; top:16px; left:16px; z-index:3; display:inline-flex; align-items:center; gap:8px;
+      padding:8px 14px; border-radius:999px; background:rgba(8,22,38,.55); color:#9ae6e6; font-weight:800; font-size:.78rem; letter-spacing:.1em; text-transform:uppercase; backdrop-filter:blur(6px); }
+    .model-viewport .vp-badge i { width:8px; height:8px; border-radius:50%; background:#2ee6c6; box-shadow:0 0 0 4px rgba(46,230,198,.2); animation:vppulse 2s infinite; }
+    @keyframes vppulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .model-viewport .vp-hint { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:3; text-align:center;
+      color:#bfe9ec; font-size:.84rem; font-weight:600; background:rgba(8,22,38,.5); padding:8px 16px; border-radius:999px; backdrop-filter:blur(4px); pointer-events:none; }
+    .model-loader { position:absolute; inset:0; z-index:4; display:grid; place-items:center; background:#0a2136; color:#bfe9ec; transition:opacity .5s; }
+    .model-loader.hidden { opacity:0; pointer-events:none; }
+    .model-loader .ring { width:46px; height:46px; border-radius:50%; border:3px solid rgba(255,255,255,.14); border-top-color:#2ee6c6; animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    .showroom-panel { display:flex; flex-direction:column; padding:30px 28px; background:#fff; }
+    .showroom-panel .sp-label { margin:0 0 4px; color:var(--teal-deep); font:800 .8rem/1.2 Sora,sans-serif; letter-spacing:.12em; text-transform:uppercase; }
+    .showroom-panel h3 { margin:0 0 6px; font-size:1.75rem; line-height:1.1; font-weight:800; transition:opacity .3s; }
+    .showroom-panel .sp-desc { margin:0 0 18px; color:#3f5a71; font-size:1.02rem; min-height:48px; transition:opacity .3s; }
+    .sp-figures { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+    .sp-fig { padding:14px 16px; border-radius:13px; background:#eef7fa; border:1px solid #e2eef3; }
+    .sp-fig b { display:block; font-family:Sora,sans-serif; font-weight:800; font-size:1.4rem; color:#075a7c; letter-spacing:-.02em; }
+    .sp-fig span { display:block; margin-top:3px; color:var(--muted); font-size:.82rem; }
+    .sp-bar-wrap { margin-bottom:22px; }
+    .sp-bar-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; font-size:.84rem; color:var(--muted); font-weight:600; }
+    .sp-bar { height:11px; border-radius:999px; background:#e7eef4; overflow:hidden; }
+    .sp-bar > i { display:block; height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,var(--teal),var(--blue)); transition:width .8s cubic-bezier(.22,1,.36,1); }
+    .line-btns { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; margin-top:auto; }
+    .line-btn { display:flex; align-items:center; gap:9px; min-height:48px; padding:9px 12px; border:1px solid var(--line); border-radius:11px;
+      background:#fff; color:#49677d; cursor:pointer; font:700 .86rem/1.15 Inter,sans-serif; text-align:left; transition:all .16s; }
+    .line-btn:hover { border-color:var(--teal); color:var(--teal-deep); transform:translateY(-1px); }
+    .line-btn.active { color:#fff; background:var(--teal); border-color:var(--teal); box-shadow:0 7px 18px rgba(14,165,160,.32); }
+    .line-btn .ico { font-size:1.25rem; line-height:1; }
+
+    /* Scroll reveal */
+    .reveal { opacity:0; transform:translateY(26px); transition:opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
+    .reveal.in { opacity:1; transform:none; }
+    .reveal.d1 { transition-delay:.08s; } .reveal.d2 { transition-delay:.16s; } .reveal.d3 { transition-delay:.24s; }
+    @media (prefers-reduced-motion:reduce) { .reveal { opacity:1 !important; transform:none !important; } }
+
+    /* Barra de progreso de lectura */
+    .read-progress { position:fixed; top:0; left:0; height:3px; width:0; z-index:100;
+      background:linear-gradient(90deg,var(--teal),var(--accent)); box-shadow:0 0 10px rgba(14,165,160,.5); transition:width .1s linear; }
+
+    /* Botón volver arriba */
+    .to-top { position:fixed; right:22px; bottom:22px; z-index:90; width:48px; height:48px; border:0; border-radius:50%; cursor:pointer;
+      background:var(--teal); color:#fff; font-size:1.3rem; box-shadow:0 10px 26px rgba(14,165,160,.4); opacity:0; transform:translateY(14px) scale(.9); transition:all .25s; }
+    .to-top.show { opacity:1; transform:none; }
+    .to-top:hover { background:var(--teal-deep); }
+
+    @media (max-width:960px) {
+      .hero-grid { grid-template-columns:1fr; }
+      .hero-3d { min-height:320px; order:-1; }
+      .showroom-stage { grid-template-columns:1fr; }
+      .model-viewport { min-height:400px; }
+    }
+    @media (max-width:540px) {
+      .hero-stats { gap:18px; }
+      .hero-stat b { font-size:1.6rem; }
+      .line-btns { grid-template-columns:1fr; }
+      .sp-figures { grid-template-columns:1fr 1fr; }
+    }
   </style>
 </head>
 <body>
+  <div class="read-progress" id="readProgress"></div>
+  <button class="to-top" id="toTop" aria-label="Volver arriba" title="Volver arriba">↑</button>
   <div class="site-nav">
     <nav class="wrap" aria-label="Navegación principal">
       <a class="brand" href="#inicio">Ventas · PySpark + Power BI</a>
-      <div class="nav-links"><a href="#etl">ETL</a><a href="#tablero">Tablero</a><a href="#requerimientos">Requerimientos</a><a href="#hallazgos">Resultados</a><a href="#anova-region">ANOVA</a></div>
+      <div class="nav-links"><a href="#showroom">Catálogo 3D</a><a href="#etl">ETL</a><a href="#tablero">Tablero</a><a href="#requerimientos">Requerimientos</a><a href="#hallazgos">Resultados</a><a href="#anova-region">ANOVA</a></div>
     </nav>
   </div>
 
   <header class="hero" id="inicio">
     <div class="wrap">
       <div class="hero-grid">
-        <div>
+        <div class="hero-copy">
           <span class="eyebrow">Proyecto académico · Ingeniería de Software</span>
           <h1>Análisis de ventas, desde el dato hasta la decisión.</h1>
-          <p class="lead">Proyecto académico · Universidad Cooperativa de Colombia, Campus Pasto.</p>
-          <p class="lead"><strong>Integrantes:</strong> Michael David Lagos Rosero · Nicolás Alejandro Bastidas · Julio Esteban Bolaños · Ronald Felipe Benavides.</p>
-          <p class="lead">Transformación con Python y PySpark, análisis estadístico y visualización interactiva con Power BI.</p>
+          <p class="lead">Transformación con Python y PySpark, análisis estadístico y visualización interactiva con Power BI, sobre un catálogo de <strong>modelos a escala</strong> de autos, motos, aviones, barcos y trenes.</p>
+          <p class="lead" style="font-size:1.05rem"><strong>Universidad Cooperativa de Colombia · Campus Pasto.</strong><br>Michael David Lagos Rosero · Nicolás Alejandro Bastidas · Julio Esteban Bolaños · Ronald Felipe Benavides.</p>
+          <div class="hero-stats">
+            <div class="hero-stat"><b data-count="2823" data-suffix="">0</b><span>pedidos analizados</span></div>
+            <div class="hero-stat"><b data-count="10" data-suffix="">0</b><span>requerimientos</span></div>
+            <div class="hero-stat"><b data-count="7" data-suffix="">0</b><span>líneas de producto</span></div>
+          </div>
+          <a class="jump" href="#showroom" style="margin-top:28px">Explorar el catálogo 3D ↓</a>
+        </div>
+        <div class="hero-3d" id="hero3d" aria-hidden="true">
+          <span class="hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg>Arrastra para girar</span>
         </div>
       </div>
     </div>
   </header>
 
   <main class="wrap">
+    <section id="showroom" aria-labelledby="showroom-title">
+      <div class="section-head reveal">
+        <div><span class="section-num">00 · CATÁLOGO INTERACTIVO</span><h2 id="showroom-title">Showroom 3D de líneas de producto</h2></div>
+        <p>El dataset son modelos a escala. Elige una categoría y explora su modelo 3D: arrástralo para girarlo y usa la rueda para acercarte. Cada tarjeta muestra sus ventas reales (pedidos <strong>Shipped</strong>).</p>
+      </div>
+      <div class="showroom-stage reveal d1">
+        <div class="model-viewport" id="modelViewport">
+          <span class="vp-badge"><i></i> En vivo · 3D</span>
+          <span class="vp-hint">Arrastra para girar · rueda para zoom</span>
+          <div class="model-loader" id="modelLoader"><div class="ring"></div></div>
+        </div>
+        <div class="showroom-panel">
+          <p class="sp-label">Línea seleccionada</p>
+          <h3 id="spTitle">Classic Cars</h3>
+          <p class="sp-desc" id="spDesc">La categoría líder del catálogo: autos clásicos de colección, los que más importe generan en todo el periodo.</p>
+          <div class="sp-figures">
+            <div class="sp-fig"><b id="spSales">$3.92M</b><span>ventas realizadas</span></div>
+            <div class="sp-fig"><b id="spShare">40%</b><span>del total vendido</span></div>
+          </div>
+          <div class="sp-bar-wrap">
+            <div class="sp-bar-top"><span>Participación en ventas</span><span id="spRank">#1 de 7</span></div>
+            <div class="sp-bar"><i id="spBar"></i></div>
+          </div>
+          <div class="line-btns" id="lineBtns" role="tablist" aria-label="Seleccionar línea de producto"></div>
+        </div>
+      </div>
+      <p class="notice reveal">Los modelos 3D se generan en el navegador con <strong>Three.js</strong> (sin archivos externos) y representan cada línea del catálogo. Las cifras de ventas provienen del análisis del tablero Power BI.</p>
+    </section>
+
     <section id="etl" aria-labelledby="etl-title">
       <div class="section-head">
         <div><span class="section-num">01 · PROCESO ETL</span><h2 id="etl-title">Preparación y limpieza de los datos</h2></div>
@@ -820,6 +943,323 @@ print(f"ANOVA de Welch: F={welch_f:.4f}, p={welch_p:.4f}")</code></pre>
       report.src = `${reportUrl}&pageName=${page.pageName}`;
     }
     tabs.forEach(tab => tab.addEventListener('click', () => showPage(Number(tab.dataset.page))));
+  </script>
+
+  <!-- ====== Interacciones: 3D (Three.js), contadores, scroll-reveal ====== -->
+  <script>
+  (function () {
+    'use strict';
+
+    /* ---------- Utilidades de interfaz (no dependen de WebGL) ---------- */
+    // Barra de progreso de lectura + botón volver arriba
+    var progress = document.getElementById('readProgress');
+    var toTop = document.getElementById('toTop');
+    function onScroll() {
+      var h = document.documentElement;
+      var max = h.scrollHeight - h.clientHeight;
+      var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max : 0;
+      if (progress) progress.style.width = (pct * 100) + '%';
+      if (toTop) toTop.classList.toggle('show', (window.scrollY || h.scrollTop) > 600);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    if (toTop) toTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+    // Scroll-reveal
+    var revealEls = document.querySelectorAll(
+      '.section-head, .step, .requirement, .panel, .anova-summary, .anova-result, .anova-table-wrap, .anova-figure, .script-intro, .dashboard, .report-stage, .showroom-stage, .notice'
+    );
+    revealEls.forEach(function (el) { el.classList.add('reveal'); });
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+      }, { threshold: 0.12 });
+      revealEls.forEach(function (el) { io.observe(el); });
+    } else {
+      revealEls.forEach(function (el) { el.classList.add('in'); });
+    }
+
+    // Contadores animados
+    function animateCount(el) {
+      var target = parseFloat(el.getAttribute('data-count')) || 0;
+      var suffix = el.getAttribute('data-suffix') || '';
+      var start = null, dur = 1400;
+      function fmt(n) { return Math.round(n).toLocaleString('es-CO'); }
+      function step(ts) {
+        if (!start) start = ts;
+        var p = Math.min((ts - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = fmt(target * eased) + suffix;
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    var counters = document.querySelectorAll('[data-count]');
+    if ('IntersectionObserver' in window) {
+      var io2 = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { animateCount(e.target); io2.unobserve(e.target); } });
+      }, { threshold: 0.5 });
+      counters.forEach(function (el) { io2.observe(el); });
+    } else { counters.forEach(animateCount); }
+
+    /* ---------- 3D con Three.js ---------- */
+    function startThree() {
+      if (typeof THREE === 'undefined') return;
+
+      // Helpers de materiales y primitivas
+      function mat(color, o) { o = o || {}; return new THREE.MeshStandardMaterial({ color: color, roughness: o.rough != null ? o.rough : 0.55, metalness: o.metal != null ? o.metal : 0.15, flatShading: o.flat !== false }); }
+      function box(w, h, d, color, o) { var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, o)); m.castShadow = true; m.receiveShadow = true; return m; }
+      function cyl(rt, rb, h, color, seg, o) { var m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 24), mat(color, o)); m.castShadow = true; return m; }
+      function wheel(x, y, z, r, w, hub) {
+        var g = new THREE.Group();
+        var t = cyl(r, r, w, '#141619', 22, { rough: 0.85, metal: 0.1 }); t.rotation.x = Math.PI / 2; g.add(t);
+        var rim = cyl(r * 0.42, r * 0.42, w + 0.02, hub || '#c9ccd2', 14, { metal: 0.8, rough: 0.3 }); rim.rotation.x = Math.PI / 2; g.add(rim);
+        g.position.set(x, y, z); return g;
+      }
+
+      /* --- Constructores de modelos (low-poly) --- */
+      function buildCar(c) {
+        var g = new THREE.Group();
+        var body0 = box(4, 0.7, 1.8, c.body, { metal: 0.45, rough: 0.3 }); body0.position.set(0, 0.95, 0); g.add(body0);
+        var low0 = box(4.2, 0.45, 1.7, c.body, { metal: 0.45, rough: 0.3 }); low0.position.set(0, 0.62, 0); g.add(low0);
+        var cabin = box(1.9, 0.7, 1.5, c.cabin || '#20364a', { metal: 0.2, rough: 0.15 }); cabin.position.set(-0.2, 1.5, 0); g.add(cabin);
+        var hood = box(1.3, 0.3, 1.6, c.body, { metal: 0.45 }); hood.position.set(1.4, 1.15, 0); g.add(hood);
+        [[1.3, 0.95], [1.3, -0.95], [-1.3, 0.95], [-1.3, -0.95]].forEach(function (p) { g.add(wheel(p[0], 0.5, p[1], 0.5, 0.35)); });
+        [[2.05, 0.6], [2.05, -0.6]].forEach(function (p) { var l = box(0.12, 0.2, 0.3, '#fff6cf', { metal: 0.1, rough: 0.1 }); l.position.set(p[0], 0.95, p[1]); g.add(l); });
+        var sp = box(0.2, 0.1, 1.6, '#15181c'); sp.position.set(-2, 1.25, 0); g.add(sp);
+        return g;
+      }
+      function buildVintage(c) {
+        var g = new THREE.Group();
+        var body = box(3.6, 0.9, 1.6, c.body, { metal: 0.3, rough: 0.4 }); body.position.y = 1.0; g.add(body);
+        var cabin = box(1.8, 1.0, 1.5, c.cabin || '#2a2118', { metal: 0.2, rough: 0.3 }); cabin.position.set(-0.4, 1.9, 0); g.add(cabin);
+        var hood = box(1.6, 0.6, 1.4, c.body, { metal: 0.3 }); hood.position.set(1.3, 1.2, 0); g.add(hood);
+        var grille = box(0.2, 0.7, 1.2, '#d9c27a', { metal: 0.7, rough: 0.25 }); grille.position.set(2.2, 1.0, 0); g.add(grille);
+        var b1 = box(3.8, 0.15, 0.2, '#1c1c1c'); b1.position.set(0, 0.62, 0.85); g.add(b1);
+        var b2 = b1.clone(); b2.position.z = -0.85; g.add(b2);
+        [[1.2, 0.9], [1.2, -0.9], [-1.2, 0.9], [-1.2, -0.9]].forEach(function (p) { g.add(wheel(p[0], 0.55, p[1], 0.55, 0.3, '#e2d9b0')); });
+        [[2.0, 0.65], [2.0, -0.65]].forEach(function (p) { var l = cyl(0.18, 0.18, 0.15, '#fff3c0', 12, { metal: 0.3 }); l.rotation.z = Math.PI / 2; l.position.set(p[0], 1.5, p[1]); g.add(l); });
+        return g;
+      }
+      function buildMoto(c) {
+        var g = new THREE.Group();
+        g.add(wheel(1.5, 0.9, 0, 0.9, 0.28));
+        g.add(wheel(-1.5, 0.9, 0, 0.9, 0.28));
+        var tank = box(1.4, 0.6, 0.7, c.body, { metal: 0.5, rough: 0.25 }); tank.position.set(0, 1.5, 0); g.add(tank);
+        var seat = box(1.1, 0.25, 0.6, '#1b1b1b'); seat.position.set(-0.9, 1.45, 0); g.add(seat);
+        var eng = box(0.8, 0.6, 0.8, '#3a3f45', { metal: 0.6 }); eng.position.set(0, 0.95, 0); g.add(eng);
+        var f1 = box(0.12, 1.3, 0.12, '#2a2d31', { metal: 0.6 }); f1.position.set(1.3, 1.3, 0.18); f1.rotation.z = 0.4; g.add(f1);
+        var f2 = f1.clone(); f2.position.z = -0.18; g.add(f2);
+        var hb = box(0.1, 0.1, 0.9, '#2a2d31', { metal: 0.6 }); hb.position.set(1.0, 2.0, 0); g.add(hb);
+        var ex = cyl(0.1, 0.12, 1.4, '#cfd3d8', 12, { metal: 0.8 }); ex.rotation.z = Math.PI / 2; ex.position.set(-0.8, 0.8, 0.35); g.add(ex);
+        return g;
+      }
+      function buildPlane(c) {
+        var g = new THREE.Group();
+        var fus = cyl(0.5, 0.35, 4.2, c.body, 26, { metal: 0.4, rough: 0.3 }); fus.rotation.z = Math.PI / 2; fus.position.y = 1.6; g.add(fus);
+        var nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.9, 22), mat(c.body, { metal: 0.4 })); nose.rotation.z = -Math.PI / 2; nose.position.set(2.4, 1.6, 0); g.add(nose);
+        var wing = box(1.3, 0.12, 5.4, c.cabin || '#d9dee3', { metal: 0.3, rough: 0.4 }); wing.position.set(0.1, 1.5, 0); g.add(wing);
+        var tw = box(0.9, 0.1, 2.0, c.cabin || '#d9dee3', { metal: 0.3 }); tw.position.set(-1.9, 1.7, 0); g.add(tw);
+        var fin = box(0.9, 1.2, 0.12, c.body, { metal: 0.4 }); fin.position.set(-1.9, 2.2, 0); g.add(fin);
+        [[0.4, 1.4], [0.4, -1.4]].forEach(function (p) { var e = cyl(0.28, 0.28, 0.9, '#3a3f45', 16, { metal: 0.6 }); e.rotation.z = Math.PI / 2; e.position.set(p[0], 1.2, p[1]); g.add(e); });
+        var s1 = box(2.6, 0.2, 0.05, '#bfe3ff', { metal: 0.2, rough: 0.1 }); s1.position.set(0.3, 1.75, 0.5); g.add(s1);
+        var s2 = s1.clone(); s2.position.z = -0.5; g.add(s2);
+        return g;
+      }
+      function buildShip(c) {
+        var g = new THREE.Group();
+        var hull = box(4.4, 0.9, 1.6, c.body, { metal: 0.2, rough: 0.5 }); hull.position.y = 0.8; g.add(hull);
+        var hull2 = box(3.6, 0.5, 1.2, c.body, { metal: 0.2, rough: 0.5 }); hull2.position.y = 0.35; g.add(hull2);
+        var deck = box(3.8, 0.15, 1.4, '#c9a36b', { rough: 0.7 }); deck.position.y = 1.28; g.add(deck);
+        var cabin = box(1.6, 0.9, 1.0, '#eef2f5', { rough: 0.4 }); cabin.position.set(-0.3, 1.8, 0); g.add(cabin);
+        var bridge = box(1.0, 0.5, 0.8, '#dfe6ea', { rough: 0.4 }); bridge.position.set(-0.3, 2.45, 0); g.add(bridge);
+        [0.0, 0.7].forEach(function (x) { var f = cyl(0.22, 0.26, 0.8, c.cabin || '#b4432f', 14, { rough: 0.5 }); f.position.set(0.3 - x, 2.3, 0); g.add(f); });
+        var mast = cyl(0.05, 0.05, 1.6, '#555', 8); mast.position.set(1.4, 2.2, 0); g.add(mast);
+        return g;
+      }
+      function buildTrain(c) {
+        var g = new THREE.Group();
+        var boiler = cyl(0.8, 0.8, 3.0, c.body, 26, { metal: 0.3, rough: 0.4 }); boiler.rotation.z = Math.PI / 2; boiler.position.set(0.3, 1.1, 0); g.add(boiler);
+        var cab = box(1.3, 1.5, 1.7, c.cabin || '#7a1f16', { rough: 0.5 }); cab.position.set(-1.8, 1.3, 0); g.add(cab);
+        var roof = box(1.5, 0.2, 1.9, '#2a2a2a'); roof.position.set(-1.8, 2.15, 0); g.add(roof);
+        var front = cyl(0.85, 0.85, 0.3, '#2a2a2a', 22); front.rotation.z = Math.PI / 2; front.position.set(1.85, 1.1, 0); g.add(front);
+        var chim = cyl(0.25, 0.3, 0.6, '#1c1c1c', 16); chim.position.set(1.4, 1.95, 0); g.add(chim);
+        var dome = cyl(0.3, 0.3, 0.3, '#d9b24a', 16, { metal: 0.6 }); dome.position.set(0.4, 1.95, 0); g.add(dome);
+        var cc = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.8, 4), mat('#2a2a2a')); cc.rotation.z = -Math.PI / 2; cc.rotation.y = Math.PI / 4; cc.position.set(2.3, 0.55, 0); g.add(cc);
+        var base = box(3.6, 0.3, 1.3, '#1c1c1c'); base.position.set(0, 0.45, 0); g.add(base);
+        [1.2, 0.2, -0.8].forEach(function (x) { [0.75, -0.75].forEach(function (z) { g.add(wheel(x, 0.45, z, 0.45, 0.18, '#b23')); }); });
+        return g;
+      }
+      function buildTruck(c) {
+        var g = new THREE.Group();
+        var cab = box(1.3, 1.3, 1.8, c.body, { metal: 0.4, rough: 0.3 }); cab.position.set(1.4, 1.25, 0); g.add(cab);
+        var ws = box(0.1, 0.7, 1.5, '#20364a', { metal: 0.2, rough: 0.15 }); ws.position.set(2.05, 1.5, 0); g.add(ws);
+        var boxc = box(3.2, 1.8, 1.9, c.cabin || '#e8ebee', { rough: 0.6 }); boxc.position.set(-1.0, 1.5, 0); g.add(boxc);
+        var chassis = box(5, 0.3, 1.5, '#1c1c1c'); chassis.position.set(0, 0.6, 0); g.add(chassis);
+        [2.0, -0.3, -1.6, -2.4].forEach(function (x) { [0.85, -0.85].forEach(function (z) { g.add(wheel(x, 0.5, z, 0.5, 0.3)); }); });
+        var grille = box(0.12, 0.5, 1.4, '#2a2d31', { metal: 0.6 }); grille.position.set(2.1, 1.0, 0); g.add(grille);
+        return g;
+      }
+
+      // Normaliza tamaño y apoya el modelo sobre y=0
+      function normalize(group, targetSize) {
+        var bb = new THREE.Box3().setFromObject(group), size = new THREE.Vector3();
+        bb.getSize(size);
+        var s = targetSize / Math.max(size.x, size.y, size.z);
+        group.scale.setScalar(s);
+        var bb2 = new THREE.Box3().setFromObject(group), c = new THREE.Vector3();
+        bb2.getCenter(c);
+        group.position.x -= c.x; group.position.z -= c.z; group.position.y -= bb2.min.y;
+        return group;
+      }
+
+      // Visor reutilizable
+      function makeViewer(container, opts) {
+        opts = opts || {};
+        var scene = new THREE.Scene();
+        var w = container.clientWidth || 400, h = container.clientHeight || 400;
+        var camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 100);
+        var renderer;
+        try {
+          renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        } catch (err) { return null; }
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(w, h);
+        renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.HemisphereLight(0xdff2ff, 0x16222e, 0.9));
+        var key = new THREE.DirectionalLight(0xffffff, 1.0);
+        key.position.set(6, 10, 6); key.castShadow = true;
+        key.shadow.mapSize.set(1024, 1024);
+        key.shadow.camera.near = 1; key.shadow.camera.far = 40;
+        key.shadow.camera.left = -8; key.shadow.camera.right = 8; key.shadow.camera.top = 8; key.shadow.camera.bottom = -8;
+        scene.add(key);
+        var teal = new THREE.PointLight(0x18e0c0, 0.6, 40); teal.position.set(-6, 4, -4); scene.add(teal);
+        var fill = new THREE.DirectionalLight(0x9ad7ff, 0.35); fill.position.set(-5, 3, 5); scene.add(fill);
+
+        // Pedestal + sombra de contacto
+        var disk = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.6, 0.3, 48), new THREE.MeshStandardMaterial({ color: 0x0c2235, roughness: 0.9, metalness: 0.1 }));
+        disk.position.y = -0.17; disk.receiveShadow = true; scene.add(disk);
+        var ring = new THREE.Mesh(new THREE.TorusGeometry(4.3, 0.04, 8, 64), new THREE.MeshStandardMaterial({ color: 0x18e0c0, emissive: 0x0b8f7a, emissiveIntensity: 0.6, roughness: 0.5 }));
+        ring.rotation.x = Math.PI / 2; ring.position.y = 0.0; scene.add(ring);
+
+        var holder = new THREE.Group(); scene.add(holder);
+
+        var theta = 0.8, phi = 1.12, R = opts.startR || 10;
+        var tgt = new THREE.Vector3(0, 1.3, 0);
+        var dragging = false, lx = 0, ly = 0, idle = 0, enter = 1;
+
+        function pt(e) { var t = e.touches ? e.touches[0] : e; return { x: t.clientX, y: t.clientY }; }
+        function down(e) { dragging = true; idle = 0; var p = pt(e); lx = p.x; ly = p.y; }
+        function move(e) {
+          if (!dragging) return;
+          var p = pt(e); theta -= (p.x - lx) * 0.01; phi -= (p.y - ly) * 0.008;
+          phi = Math.max(0.5, Math.min(1.45, phi)); lx = p.x; ly = p.y; idle = 0;
+          if (e.cancelable) e.preventDefault();
+        }
+        function up() { dragging = false; }
+        container.addEventListener('pointerdown', down);
+        window.addEventListener('pointermove', move, { passive: false });
+        window.addEventListener('pointerup', up);
+        if (opts.zoom) {
+          container.addEventListener('wheel', function (e) { R = Math.max(opts.minR || 6, Math.min(opts.maxR || 16, R + e.deltaY * 0.012)); e.preventDefault(); }, { passive: false });
+        }
+
+        function setModel(group) {
+          while (holder.children.length) holder.remove(holder.children[0]);
+          holder.add(group); enter = 0;
+        }
+        function resize() {
+          var W = container.clientWidth, H = container.clientHeight;
+          if (!W || !H) return;
+          camera.aspect = W / H; camera.updateProjectionMatrix(); renderer.setSize(W, H);
+        }
+        window.addEventListener('resize', resize);
+
+        var running = true;
+        function frame() {
+          if (!running) return;
+          if (!dragging) { idle += 1; if (opts.autoRotate !== false && idle > (opts.idleBeforeSpin || 0)) theta += 0.0024; }
+          if (enter < 1) { enter = Math.min(1, enter + 0.06); var e = 1 - Math.pow(1 - enter, 3); holder.scale.setScalar(e); holder.position.y = (1 - e) * -0.6; }
+          ring.material.emissiveIntensity = 0.45 + Math.sin(Date.now() * 0.002) * 0.2;
+          camera.position.set(tgt.x + R * Math.sin(phi) * Math.sin(theta), tgt.y + R * Math.cos(phi), tgt.z + R * Math.sin(phi) * Math.cos(theta));
+          camera.lookAt(tgt);
+          renderer.render(scene, camera);
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+        resize();
+        return { setModel: setModel };
+      }
+
+      /* --- Catálogo de líneas de producto --- */
+      var LINES = [
+        { name: 'Classic Cars', ico: '🏎️', sales: 3919615, build: buildCar, color: { body: '#d5372e', cabin: '#1d2a38' }, desc: 'Autos deportivos clásicos de colección: la categoría líder, la que más importe genera en todo el periodo.' },
+        { name: 'Vintage Cars', ico: '🚗', sales: 1903151, build: buildVintage, color: { body: '#2f8f7f', cabin: '#2a2118' }, desc: 'Autos de época con estribos y faros redondos. Segunda línea del catálogo por ventas.' },
+        { name: 'Motorcycles', ico: '🏍️', sales: 1166388, build: buildMoto, color: { body: '#e0912f' }, desc: 'Motocicletas a escala. Tercera línea en importe, con buen volumen de unidades vendidas.' },
+        { name: 'Trucks & Buses', ico: '🚚', sales: 1127790, build: buildTruck, color: { body: '#2d6fb0', cabin: '#e8ebee' }, desc: 'Camiones y buses. El canal se aproxima con deal_size (Small / Medium / Large).' },
+        { name: 'Planes', ico: '✈️', sales: 975004, build: buildPlane, color: { body: '#dfe4e9', cabin: '#9fb4c4' }, desc: 'Aviones a escala. Ticket alto por unidad y presencia en varias regiones comerciales.' },
+        { name: 'Ships', ico: '🚢', sales: 714437, build: buildShip, color: { body: '#324a5e', cabin: '#b4432f' }, desc: 'Barcos y navíos. Línea de nicho, con importes menores pero estables en el tiempo.' },
+        { name: 'Trains', ico: '🚂', sales: 226243, build: buildTrain, color: { body: '#1f6f74', cabin: '#7a1f16' }, desc: 'Trenes y locomotoras. La categoría más pequeña por importe, pero con el mejor margen (48 %).' }
+      ];
+      var TOTAL = LINES.reduce(function (s, l) { return s + l.sales; }, 0);
+      function money(n) { return '$' + (n / 1e6).toFixed(2) + 'M'; }
+
+      // Héroe: muestra el Classic Cars girando
+      var heroEl = document.getElementById('hero3d');
+      if (heroEl) {
+        var heroView = makeViewer(heroEl, { autoRotate: true, zoom: false, startR: 10 });
+        if (heroView) heroView.setModel(normalize(buildCar(LINES[0].color), 5.2));
+        else { heroEl.style.display = 'none'; }
+      }
+
+      // Showroom interactivo
+      var vp = document.getElementById('modelViewport');
+      var loader = document.getElementById('modelLoader');
+      var spTitle = document.getElementById('spTitle'), spDesc = document.getElementById('spDesc');
+      var spSales = document.getElementById('spSales'), spShare = document.getElementById('spShare');
+      var spBar = document.getElementById('spBar'), spRank = document.getElementById('spRank');
+      var lineBtns = document.getElementById('lineBtns');
+
+      if (vp && lineBtns) {
+        var showView = makeViewer(vp, { autoRotate: true, zoom: true, startR: 10.5, minR: 6, maxR: 17 });
+        if (!showView) {
+          if (loader) loader.innerHTML = '<p style="padding:20px;text-align:center">Tu navegador no pudo iniciar el 3D (WebGL). El resto de la presentación funciona con normalidad.</p>';
+        } else {
+          var maxSales = Math.max.apply(null, LINES.map(function (l) { return l.sales; }));
+          LINES.forEach(function (line, i) {
+            var b = document.createElement('button');
+            b.className = 'line-btn' + (i === 0 ? ' active' : '');
+            b.type = 'button'; b.setAttribute('role', 'tab');
+            b.innerHTML = '<span class="ico">' + line.ico + '</span><span>' + line.name + '</span>';
+            b.addEventListener('click', function () { select(i); });
+            lineBtns.appendChild(b);
+          });
+          function select(i) {
+            var line = LINES[i];
+            showView.setModel(normalize(line.build(line.color), 5.4));
+            Array.prototype.forEach.call(lineBtns.children, function (b, bi) { b.classList.toggle('active', bi === i); });
+            spTitle.style.opacity = 0; spDesc.style.opacity = 0;
+            setTimeout(function () {
+              spTitle.textContent = line.name; spDesc.textContent = line.desc;
+              spSales.textContent = money(line.sales);
+              spShare.textContent = Math.round(line.sales / TOTAL * 100) + '%';
+              spRank.textContent = '#' + (i + 1) + ' de ' + LINES.length;
+              spTitle.style.opacity = 1; spDesc.style.opacity = 1;
+              spBar.style.width = (line.sales / maxSales * 100) + '%';
+            }, 180);
+          }
+          select(0);
+          if (loader) setTimeout(function () { loader.classList.add('hidden'); }, 500);
+        }
+      }
+    }
+
+    // Arranca cuando Three.js (defer) esté disponible
+    if (document.readyState === 'complete') startThree();
+    else window.addEventListener('load', startThree);
+  })();
   </script>
 </body>
 </html>
