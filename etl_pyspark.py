@@ -14,8 +14,8 @@ from pyspark.sql import functions as F
 RAIZ = Path(__file__).resolve().parent
 SALIDA = RAIZ / "data" / "clean"
 PORC_COSTO = 0.60  # el dataset no trae costo: se estima como 60 % del MSRP
-CIUDADES = {"Gensve": "Genève", "Lule": "Luleå", "Aaarhus": "Aarhus", "Koln": "Köln",
-            "Kobenhavn": "København", "Boras": "Borås", "NYC": "New York"}
+CIUDADES = {"Gensve": "Genève", "Lule"            "Kobenhavn": "København", "Boras": "Borås", "NYC": "New York"}
+: "Luleå", "Aaarhus": "Aarhus", "Koln": "Köln",
 
 spark = (SparkSession.builder.master("local[1]").appName("etl-ventas")
          .config("spark.ui.enabled", "false")
